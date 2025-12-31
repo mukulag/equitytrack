@@ -1,11 +1,11 @@
-import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3 } from 'lucide-react';
 import { useTrades } from '@/hooks/useTrades';
 import { StatsCard } from '@/components/StatsCard';
 import { AddTradeDialog } from '@/components/AddTradeDialog';
 import { TradesTable } from '@/components/TradesTable';
 
 const Index = () => {
-  const { trades, addTrade, addExit, deleteTrade, deleteExit, getStats } = useTrades();
+  const { trades, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, getStats } = useTrades();
   const stats = getStats();
 
   const formatCurrency = (value: number) => {
@@ -39,9 +39,26 @@ const Index = () => {
 
       <main className="container mx-auto px-6 py-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           <StatsCard
-            title="Total P&L"
+            title="Total Exposure"
+            value={formatCurrency(stats.totalExposure)}
+            icon={BarChart3}
+          />
+          <StatsCard
+            title="Total Risk"
+            value={formatCurrency(stats.totalRisk)}
+            icon={AlertTriangle}
+            trend={stats.totalRisk > 0 ? 'down' : 'neutral'}
+          />
+          <StatsCard
+            title="Unrealized P&L"
+            value={formatCurrency(stats.unrealizedPnl)}
+            icon={TrendingUp}
+            trend={stats.unrealizedPnl > 0 ? 'up' : stats.unrealizedPnl < 0 ? 'down' : 'neutral'}
+          />
+          <StatsCard
+            title="Booked P&L"
             value={formatCurrency(stats.totalPnl)}
             icon={Wallet}
             trend={stats.totalPnl > 0 ? 'up' : stats.totalPnl < 0 ? 'down' : 'neutral'}
@@ -54,15 +71,10 @@ const Index = () => {
             subtitle={`${stats.winningTrades}W / ${stats.losingTrades}L`}
           />
           <StatsCard
-            title="Open Trades"
-            value={stats.openTrades}
-            icon={TrendingUp}
-          />
-          <StatsCard
-            title="Closed Trades"
-            value={stats.closedTrades}
+            title="Open / Total"
+            value={`${stats.openTrades} / ${stats.totalTrades}`}
             icon={PieChart}
-            subtitle={`of ${stats.totalTrades} total`}
+            subtitle={`${stats.closedTrades} closed`}
           />
         </div>
 
@@ -74,6 +86,8 @@ const Index = () => {
             onAddExit={addExit}
             onDeleteTrade={deleteTrade}
             onDeleteExit={deleteExit}
+            onUpdateCurrentPrice={updateCurrentPrice}
+            onUpdateCurrentSL={updateCurrentSL}
           />
         </div>
       </main>

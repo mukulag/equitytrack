@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, Edit2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Trade } from '@/types/trade';
 import { AddExitDialog } from './AddExitDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -23,10 +24,16 @@ interface TradeRowProps {
   onAddExit: (tradeId: string, exit: { quantity: number; exitPrice: number; exitDate: string }) => void;
   onDeleteTrade: (tradeId: string) => void;
   onDeleteExit: (tradeId: string, exitId: string) => void;
+  onUpdateCurrentPrice: (tradeId: string, currentPrice: number | null) => void;
+  onUpdateCurrentSL: (tradeId: string, currentSL: number | null) => void;
 }
 
-export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit }: TradeRowProps) => {
+export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onUpdateCurrentSL }: TradeRowProps) => {
   const [expanded, setExpanded] = useState(false);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [editingSL, setEditingSL] = useState(false);
+  const [tempPrice, setTempPrice] = useState(trade.currentPrice?.toString() || '');
+  const [tempSL, setTempSL] = useState(trade.currentStopLoss?.toString() || '');
 
   const statusColors = {
     OPEN: 'bg-primary/20 text-primary border-primary/30',
@@ -40,6 +47,26 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit }: Trad
       currency: 'INR',
       minimumFractionDigits: 2,
     }).format(value);
+  };
+
+  // Calculate derived values
+  const activeStopLoss = trade.currentStopLoss ?? trade.setupStopLoss;
+  const slDistance = activeStopLoss ? (trade.entryPrice - activeStopLoss) : null;
+  const slPercent = activeStopLoss ? ((activeStopLoss - trade.entryPrice) / trade.entryPrice * 100) : null;
+  const currentRPT = slDistance && trade.remainingQuantity ? slDistance * trade.remainingQuantity : null;
+  const unrealizedPnl = trade.currentPrice && trade.remainingQuantity > 0
+    ? (trade.currentPrice - trade.entryPrice) * trade.remainingQuantity
+    : 0;
+  const positionSize = trade.entryPrice * trade.quantity;
+
+  const handlePriceSave = () => {
+    onUpdateCurrentPrice(trade.id, tempPrice ? parseFloat(tempPrice) : null);
+    setEditingPrice(false);
+  };
+
+  const handleSLSave = () => {
+    onUpdateCurrentSL(trade.id, tempSL ? parseFloat(tempSL) : null);
+    setEditingSL(false);
   };
 
   return (
@@ -67,11 +94,67 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit }: Trad
             {trade.tradeType}
           </Badge>
         </td>
-        <td className="p-4 font-mono text-sm">{format(new Date(trade.entryDate), 'dd MMM yyyy')}</td>
+        <td className="p-4 font-mono text-sm">{format(new Date(trade.entryDate), 'dd MMM')}</td>
         <td className="p-4 font-mono text-sm">{formatCurrency(trade.entryPrice)}</td>
-        <td className="p-4 font-mono text-sm">{trade.quantity}</td>
+        <td className="p-4">
+          {editingPrice ? (
+            <Input
+              type="number"
+              step="0.01"
+              value={tempPrice}
+              onChange={(e) => setTempPrice(e.target.value)}
+              onBlur={handlePriceSave}
+              onKeyDown={(e) => e.key === 'Enter' && handlePriceSave()}
+              className="w-24 h-7 font-mono text-sm bg-secondary/50"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => { setTempPrice(trade.currentPrice?.toString() || ''); setEditingPrice(true); }}
+              className={cn(
+                'font-mono text-sm flex items-center gap-1 hover:text-primary transition-colors',
+                trade.currentPrice ? (
+                  trade.currentPrice > trade.entryPrice ? 'text-success' : 'text-destructive'
+                ) : 'text-muted-foreground'
+              )}
+            >
+              {trade.currentPrice ? formatCurrency(trade.currentPrice) : '—'}
+              <Edit2 className="h-3 w-3 opacity-50" />
+            </button>
+          )}
+        </td>
+        <td className="p-4 font-mono text-sm">{trade.remainingQuantity}/{trade.quantity}</td>
         <td className="p-4 font-mono text-sm text-muted-foreground">
-          {trade.stopLoss ? formatCurrency(trade.stopLoss) : '—'}
+          {trade.setupStopLoss ? formatCurrency(trade.setupStopLoss) : '—'}
+        </td>
+        <td className="p-4">
+          {editingSL ? (
+            <Input
+              type="number"
+              step="0.01"
+              value={tempSL}
+              onChange={(e) => setTempSL(e.target.value)}
+              onBlur={handleSLSave}
+              onKeyDown={(e) => e.key === 'Enter' && handleSLSave()}
+              className="w-24 h-7 font-mono text-sm bg-secondary/50"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => { setTempSL(trade.currentStopLoss?.toString() || ''); setEditingSL(true); }}
+              className="font-mono text-sm text-muted-foreground flex items-center gap-1 hover:text-primary transition-colors"
+            >
+              {trade.currentStopLoss ? formatCurrency(trade.currentStopLoss) : '—'}
+              <Edit2 className="h-3 w-3 opacity-50" />
+            </button>
+          )}
+        </td>
+        <td className="p-4 font-mono text-sm">
+          {slPercent ? (
+            <span className={slPercent < 0 ? 'text-destructive' : 'text-success'}>
+              {slPercent.toFixed(1)}%
+            </span>
+          ) : '—'}
         </td>
         <td className="p-4 font-mono text-sm text-muted-foreground">
           {trade.target ? formatCurrency(trade.target) : '—'}
@@ -85,13 +168,26 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit }: Trad
           <span
             className={cn(
               'font-mono font-semibold',
-              trade.totalPnl > 0 && 'profit-text',
-              trade.totalPnl < 0 && 'loss-text',
-              trade.totalPnl === 0 && 'text-muted-foreground'
+              trade.bookedProfit > 0 && 'profit-text',
+              trade.bookedProfit < 0 && 'loss-text',
+              trade.bookedProfit === 0 && 'text-muted-foreground'
             )}
           >
-            {trade.totalPnl > 0 ? '+' : ''}
-            {formatCurrency(trade.totalPnl)}
+            {trade.bookedProfit > 0 ? '+' : ''}
+            {formatCurrency(trade.bookedProfit)}
+          </span>
+        </td>
+        <td className="p-4">
+          <span
+            className={cn(
+              'font-mono text-sm',
+              unrealizedPnl > 0 && 'profit-text',
+              unrealizedPnl < 0 && 'loss-text',
+              unrealizedPnl === 0 && 'text-muted-foreground'
+            )}
+          >
+            {unrealizedPnl > 0 ? '+' : ''}
+            {formatCurrency(unrealizedPnl)}
           </span>
         </td>
         <td className="p-4">
@@ -131,11 +227,11 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit }: Trad
               <span className="text-sm text-muted-foreground">↳ Exit</span>
             </td>
             <td className="p-4 font-mono text-sm text-muted-foreground">
-              {format(new Date(exit.exitDate), 'dd MMM yyyy')}
+              {format(new Date(exit.exitDate), 'dd MMM')}
             </td>
-            <td className="p-4 font-mono text-sm">{formatCurrency(exit.exitPrice)}</td>
+            <td className="p-4 font-mono text-sm" colSpan={2}>{formatCurrency(exit.exitPrice)}</td>
             <td className="p-4 font-mono text-sm">{exit.quantity}</td>
-            <td className="p-4" colSpan={2}></td>
+            <td className="p-4" colSpan={5}></td>
             <td className="p-4">
               <span
                 className={cn(
@@ -148,6 +244,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit }: Trad
                 {formatCurrency(exit.pnl)}
               </span>
             </td>
+            <td></td>
             <td className="p-4">
               <Button
                 variant="ghost"

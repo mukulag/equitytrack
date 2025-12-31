@@ -16,11 +16,15 @@ export interface Trade {
   entryDate: string;
   entryPrice: number;
   quantity: number;
-  stopLoss: number | null;
+  currentPrice: number | null;
+  setupStopLoss: number | null;
+  currentStopLoss: number | null;
   target: number | null;
+  targetRPT: number;
   notes: string;
   exits: Exit[];
   status: TradeStatus;
   totalPnl: number;
   remainingQuantity: number;
+  bookedProfit: number;
 }

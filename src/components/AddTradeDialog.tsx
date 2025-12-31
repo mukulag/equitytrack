@@ -27,8 +27,11 @@ interface AddTradeDialogProps {
     entryDate: string;
     entryPrice: number;
     quantity: number;
-    stopLoss: number | null;
+    currentPrice: number | null;
+    setupStopLoss: number | null;
+    currentStopLoss: number | null;
     target: number | null;
+    targetRPT: number;
     notes: string;
   }) => void;
 }
@@ -40,8 +43,11 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
   const [entryPrice, setEntryPrice] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [stopLoss, setStopLoss] = useState('');
+  const [currentPrice, setCurrentPrice] = useState('');
+  const [setupStopLoss, setSetupStopLoss] = useState('');
+  const [currentStopLoss, setCurrentStopLoss] = useState('');
   const [target, setTarget] = useState('');
+  const [targetRPT, setTargetRPT] = useState('2000');
   const [notes, setNotes] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -53,8 +59,11 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
       entryDate,
       entryPrice: parseFloat(entryPrice),
       quantity: parseInt(quantity),
-      stopLoss: stopLoss ? parseFloat(stopLoss) : null,
+      currentPrice: currentPrice ? parseFloat(currentPrice) : null,
+      setupStopLoss: setupStopLoss ? parseFloat(setupStopLoss) : null,
+      currentStopLoss: currentStopLoss ? parseFloat(currentStopLoss) : null,
       target: target ? parseFloat(target) : null,
+      targetRPT: parseFloat(targetRPT) || 2000,
       notes,
     });
 
@@ -63,8 +72,11 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
     setEntryDate(new Date().toISOString().split('T')[0]);
     setEntryPrice('');
     setQuantity('');
-    setStopLoss('');
+    setCurrentPrice('');
+    setSetupStopLoss('');
+    setCurrentStopLoss('');
     setTarget('');
+    setTargetRPT('2000');
     setNotes('');
     setOpen(false);
   };
@@ -77,7 +89,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
           New Trade
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md glass-card border-border">
+      <DialogContent className="sm:max-w-lg glass-card border-border">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Add New Trade</DialogTitle>
         </DialogHeader>
@@ -87,7 +99,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
               <Label htmlFor="symbol">Symbol</Label>
               <Input
                 id="symbol"
-                placeholder="e.g., RELIANCE"
+                placeholder="e.g., HINDCOPPER"
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
                 required
@@ -108,7 +120,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="entryDate">Entry Date</Label>
               <Input
@@ -133,6 +145,18 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 className="bg-secondary/50 border-border font-mono"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="currentPrice">Current Price</Label>
+              <Input
+                id="currentPrice"
+                type="number"
+                step="0.01"
+                placeholder="LTP"
+                value={currentPrice}
+                onChange={(e) => setCurrentPrice(e.target.value)}
+                className="bg-secondary/50 border-border font-mono"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -149,26 +173,52 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stopLoss">Stop Loss</Label>
+              <Label htmlFor="setupStopLoss">Setup SL</Label>
               <Input
-                id="stopLoss"
+                id="setupStopLoss"
                 type="number"
                 step="0.01"
-                placeholder="Optional"
-                value={stopLoss}
-                onChange={(e) => setStopLoss(e.target.value)}
+                placeholder="Original SL"
+                value={setupStopLoss}
+                onChange={(e) => setSetupStopLoss(e.target.value)}
                 className="bg-secondary/50 border-border font-mono"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="target">Target</Label>
+              <Label htmlFor="currentStopLoss">Current SL</Label>
+              <Input
+                id="currentStopLoss"
+                type="number"
+                step="0.01"
+                placeholder="Trailing SL"
+                value={currentStopLoss}
+                onChange={(e) => setCurrentStopLoss(e.target.value)}
+                className="bg-secondary/50 border-border font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="target">Target Price</Label>
               <Input
                 id="target"
                 type="number"
                 step="0.01"
-                placeholder="Optional"
+                placeholder="Target"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
+                className="bg-secondary/50 border-border font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="targetRPT">Target RPT (₹)</Label>
+              <Input
+                id="targetRPT"
+                type="number"
+                placeholder="2000"
+                value={targetRPT}
+                onChange={(e) => setTargetRPT(e.target.value)}
                 className="bg-secondary/50 border-border font-mono"
               />
             </div>
