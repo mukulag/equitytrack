@@ -18,7 +18,7 @@ export const useTrades = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newTrades));
   };
 
-  const addTrade = (trade: Omit<Trade, 'id' | 'exits' | 'status' | 'totalPnl' | 'remainingQuantity'>) => {
+  const addTrade = (trade: Omit<Trade, 'id' | 'exits' | 'status' | 'totalPnl' | 'remainingQuantity' | 'bookedProfit'>) => {
     const newTrade: Trade = {
       ...trade,
       id: crypto.randomUUID(),
@@ -26,6 +26,7 @@ export const useTrades = () => {
       status: 'OPEN',
       totalPnl: 0,
       remainingQuantity: trade.quantity,
+      bookedProfit: 0,
     };
     saveTrades([newTrade, ...trades]);
   };
@@ -49,6 +50,7 @@ export const useTrades = () => {
       const totalExitedQty = exits.reduce((sum, e) => sum + e.quantity, 0);
       const remainingQuantity = trade.quantity - totalExitedQty;
       const totalPnl = exits.reduce((sum, e) => sum + e.pnl, 0);
+      const bookedProfit = exits.reduce((sum, e) => sum + e.pnl, 0);
 
       let status: Trade['status'] = 'OPEN';
       if (remainingQuantity === 0) status = 'CLOSED';
@@ -60,6 +62,7 @@ export const useTrades = () => {
         status,
         totalPnl,
         remainingQuantity,
+        bookedProfit,
       };
     });
 
@@ -78,6 +81,7 @@ export const useTrades = () => {
       const totalExitedQty = exits.reduce((sum, e) => sum + e.quantity, 0);
       const remainingQuantity = trade.quantity - totalExitedQty;
       const totalPnl = exits.reduce((sum, e) => sum + e.pnl, 0);
+      const bookedProfit = exits.reduce((sum, e) => sum + e.pnl, 0);
 
       let status: Trade['status'] = 'OPEN';
       if (remainingQuantity === 0) status = 'CLOSED';
@@ -89,9 +93,26 @@ export const useTrades = () => {
         status,
         totalPnl,
         remainingQuantity,
+        bookedProfit,
       };
     });
 
+    saveTrades(updatedTrades);
+  };
+
+  const updateCurrentPrice = (tradeId: string, currentPrice: number | null) => {
+    const updatedTrades = trades.map((trade) => {
+      if (trade.id !== tradeId) return trade;
+      return { ...trade, currentPrice };
+    });
+    saveTrades(updatedTrades);
+  };
+
+  const updateCurrentSL = (tradeId: string, currentStopLoss: number | null) => {
+    const updatedTrades = trades.map((trade) => {
+      if (trade.id !== tradeId) return trade;
+      return { ...trade, currentStopLoss };
+    });
     saveTrades(updatedTrades);
   };
 
@@ -103,6 +124,30 @@ export const useTrades = () => {
     const winningTrades = trades.filter((t) => t.status === 'CLOSED' && t.totalPnl > 0).length;
     const losingTrades = trades.filter((t) => t.status === 'CLOSED' && t.totalPnl < 0).length;
     const winRate = closedTrades > 0 ? (winningTrades / closedTrades) * 100 : 0;
+    
+    // Calculate unrealized P&L
+    const unrealizedPnl = trades.reduce((sum, t) => {
+      if (t.currentPrice && t.remainingQuantity > 0) {
+        return sum + (t.currentPrice - t.entryPrice) * t.remainingQuantity;
+      }
+      return sum;
+    }, 0);
+    
+    // Total exposure (position size of open trades)
+    const totalExposure = trades
+      .filter((t) => t.status !== 'CLOSED')
+      .reduce((sum, t) => sum + t.entryPrice * t.remainingQuantity, 0);
+    
+    // Total risk (based on stop loss)
+    const totalRisk = trades
+      .filter((t) => t.status !== 'CLOSED')
+      .reduce((sum, t) => {
+        const sl = t.currentStopLoss ?? t.setupStopLoss;
+        if (sl) {
+          return sum + (t.entryPrice - sl) * t.remainingQuantity;
+        }
+        return sum;
+      }, 0);
 
     return {
       totalTrades,
@@ -112,6 +157,9 @@ export const useTrades = () => {
       winningTrades,
       losingTrades,
       winRate,
+      unrealizedPnl,
+      totalExposure,
+      totalRisk,
     };
   };
 
@@ -121,6 +169,8 @@ export const useTrades = () => {
     addExit,
     deleteTrade,
     deleteExit,
+    updateCurrentPrice,
+    updateCurrentSL,
     getStats,
   };
 };
