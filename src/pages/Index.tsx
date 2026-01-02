@@ -1,11 +1,14 @@
-import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut } from 'lucide-react';
 import { useTrades } from '@/hooks/useTrades';
 import { StatsCard } from '@/components/StatsCard';
 import { AddTradeDialog } from '@/components/AddTradeDialog';
 import { TradesTable } from '@/components/TradesTable';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const { trades, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, getStats } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, getStats } = useTrades();
+  const { signOut, user } = useAuth();
   const stats = getStats();
 
   const formatCurrency = (value: number) => {
@@ -32,12 +35,23 @@ const Index = () => {
                 <p className="text-xs text-muted-foreground">Track your trades & exits</p>
               </div>
             </div>
-            <AddTradeDialog onAddTrade={addTrade} />
+            <div className="flex items-center gap-3">
+              <AddTradeDialog onAddTrade={addTrade} />
+              <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-pulse text-muted-foreground">Loading trades...</div>
+          </div>
+        ) : (
+          <>
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           <StatsCard
@@ -90,6 +104,8 @@ const Index = () => {
             onUpdateCurrentSL={updateCurrentSL}
           />
         </div>
+          </>
+        )}
       </main>
     </div>
   );
