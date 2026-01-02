@@ -213,7 +213,7 @@ export const useTrades = () => {
     }
   };
 
-  const updateCurrentPrice = async (tradeId: string, currentPrice: number | null) => {
+const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, silent = false) => {
     if (!user) return;
 
     try {
@@ -223,9 +223,15 @@ export const useTrades = () => {
         .eq('id', tradeId);
 
       if (error) throw error;
-      fetchTrades();
+      
+      // Update local state immediately for live price updates
+      setTrades(prev => prev.map(t => 
+        t.id === tradeId ? { ...t, currentPrice: currentPrice ?? undefined } : t
+      ));
     } catch (error: any) {
-      toast.error('Failed to update price');
+      if (!silent) {
+        toast.error('Failed to update price');
+      }
       console.error('Update price error:', error);
     }
   };

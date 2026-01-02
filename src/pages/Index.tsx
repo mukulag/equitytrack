@@ -1,15 +1,29 @@
 import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut } from 'lucide-react';
 import { useTrades } from '@/hooks/useTrades';
+import { useLivePrices } from '@/hooks/useLivePrices';
 import { StatsCard } from '@/components/StatsCard';
 import { AddTradeDialog } from '@/components/AddTradeDialog';
 import { TradesTable } from '@/components/TradesTable';
+import { LivePriceIndicator } from '@/components/LivePriceIndicator';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { useCallback } from 'react';
 
 const Index = () => {
   const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, getStats } = useTrades();
   const { signOut, user } = useAuth();
   const stats = getStats();
+
+  const handlePriceUpdate = useCallback((tradeId: string, price: number) => {
+    updateCurrentPrice(tradeId, price, true);
+  }, [updateCurrentPrice]);
+
+  const { isRefreshing, lastRefresh, refreshNow } = useLivePrices({
+    trades,
+    onPriceUpdate: handlePriceUpdate,
+    intervalMs: 60000, // Refresh every minute
+    enabled: !loading && trades.length > 0,
+  });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -36,6 +50,11 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <LivePriceIndicator
+                isRefreshing={isRefreshing}
+                lastRefresh={lastRefresh}
+                onRefresh={refreshNow}
+              />
               <AddTradeDialog onAddTrade={addTrade} />
               <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
                 <LogOut className="h-4 w-4" />
