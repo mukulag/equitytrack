@@ -1,119 +1,250 @@
-import { useState, useEffect } from 'react';
-import { Trade, Exit, TradeType } from '@/types/trade';
-
-const STORAGE_KEY = 'trading-journal-trades';
+import { useState, useEffect, useCallback } from 'react';
+import { Trade, Exit } from '@/types/trade';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export const useTrades = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const fetchTrades = useCallback(async () => {
+    if (!user) {
+      setTrades([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data: tradesData, error: tradesError } = await supabase
+        .from('trades')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (tradesError) throw tradesError;
+
+      const { data: exitsData, error: exitsError } = await supabase
+        .from('exits')
+        .select('*');
+
+      if (exitsError) throw exitsError;
+
+      const tradesWithExits: Trade[] = (tradesData || []).map((trade) => {
+        const tradeExits = (exitsData || [])
+          .filter((exit) => exit.trade_id === trade.id)
+          .map((exit) => ({
+            id: exit.id,
+            exitDate: exit.exit_date,
+            exitPrice: Number(exit.exit_price),
+            quantity: Number(exit.quantity),
+            pnl: Number(exit.pnl),
+          }));
+
+        return {
+          id: trade.id,
+          symbol: trade.symbol,
+          tradeType: trade.trade_type as 'LONG' | 'SHORT',
+          entryDate: trade.entry_date,
+          entryTime: trade.entry_time || undefined,
+          entryPrice: Number(trade.entry_price),
+          quantity: Number(trade.quantity),
+          setupStopLoss: trade.setup_stop_loss ? Number(trade.setup_stop_loss) : undefined,
+          currentStopLoss: trade.current_stop_loss ? Number(trade.current_stop_loss) : undefined,
+          target: trade.target ? Number(trade.target) : undefined,
+          targetRPT: trade.target_rpt ? Number(trade.target_rpt) : undefined,
+          currentPrice: trade.current_price ? Number(trade.current_price) : undefined,
+          notes: trade.notes || undefined,
+          exits: tradeExits,
+          status: trade.status as 'OPEN' | 'PARTIAL' | 'CLOSED',
+          totalPnl: Number(trade.total_pnl),
+          remainingQuantity: Number(trade.remaining_quantity),
+          bookedProfit: Number(trade.booked_profit),
+        };
+      });
+
+      setTrades(tradesWithExits);
+    } catch (error: any) {
+      toast.error('Failed to fetch trades');
+      console.error('Fetch trades error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setTrades(JSON.parse(stored));
+    fetchTrades();
+  }, [fetchTrades]);
+
+  const addTrade = async (trade: Omit<Trade, 'id' | 'exits' | 'status' | 'totalPnl' | 'remainingQuantity' | 'bookedProfit'>) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase.from('trades').insert({
+        user_id: user.id,
+        symbol: trade.symbol,
+        trade_type: trade.tradeType,
+        entry_date: trade.entryDate,
+        entry_time: null,
+        entry_price: trade.entryPrice,
+        quantity: trade.quantity,
+        setup_stop_loss: trade.setupStopLoss || null,
+        current_stop_loss: trade.currentStopLoss || null,
+        target: trade.target || null,
+        target_rpt: trade.targetRPT || null,
+        current_price: trade.currentPrice || null,
+        notes: trade.notes || null,
+        remaining_quantity: trade.quantity,
+      });
+
+      if (error) throw error;
+      toast.success('Trade added successfully');
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to add trade');
+      console.error('Add trade error:', error);
     }
-  }, []);
-
-  const saveTrades = (newTrades: Trade[]) => {
-    setTrades(newTrades);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTrades));
   };
 
-  const addTrade = (trade: Omit<Trade, 'id' | 'exits' | 'status' | 'totalPnl' | 'remainingQuantity' | 'bookedProfit'>) => {
-    const newTrade: Trade = {
-      ...trade,
-      id: crypto.randomUUID(),
-      exits: [],
-      status: 'OPEN',
-      totalPnl: 0,
-      remainingQuantity: trade.quantity,
-      bookedProfit: 0,
-    };
-    saveTrades([newTrade, ...trades]);
+  const addExit = async (tradeId: string, exitData: Omit<Exit, 'id' | 'pnl'>) => {
+    if (!user) return;
+
+    const trade = trades.find((t) => t.id === tradeId);
+    if (!trade) return;
+
+    const pnl =
+      trade.tradeType === 'LONG'
+        ? (exitData.exitPrice - trade.entryPrice) * exitData.quantity
+        : (trade.entryPrice - exitData.exitPrice) * exitData.quantity;
+
+    try {
+      const { error: exitError } = await supabase.from('exits').insert({
+        trade_id: tradeId,
+        exit_date: exitData.exitDate,
+        exit_price: exitData.exitPrice,
+        quantity: exitData.quantity,
+        pnl: pnl,
+      });
+
+      if (exitError) throw exitError;
+
+      const newRemainingQty = trade.remainingQuantity - exitData.quantity;
+      const newBookedProfit = trade.bookedProfit + pnl;
+      const newTotalPnl = trade.totalPnl + pnl;
+
+      let newStatus: 'OPEN' | 'PARTIAL' | 'CLOSED' = 'OPEN';
+      if (newRemainingQty === 0) newStatus = 'CLOSED';
+      else if (trade.quantity - newRemainingQty > 0) newStatus = 'PARTIAL';
+
+      const { error: updateError } = await supabase
+        .from('trades')
+        .update({
+          remaining_quantity: newRemainingQty,
+          booked_profit: newBookedProfit,
+          total_pnl: newTotalPnl,
+          status: newStatus,
+        })
+        .eq('id', tradeId);
+
+      if (updateError) throw updateError;
+
+      toast.success('Exit recorded successfully');
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to add exit');
+      console.error('Add exit error:', error);
+    }
   };
 
-  const addExit = (tradeId: string, exitData: Omit<Exit, 'id' | 'pnl'>) => {
-    const updatedTrades = trades.map((trade) => {
-      if (trade.id !== tradeId) return trade;
+  const deleteTrade = async (tradeId: string) => {
+    if (!user) return;
 
-      const pnl =
-        trade.tradeType === 'LONG'
-          ? (exitData.exitPrice - trade.entryPrice) * exitData.quantity
-          : (trade.entryPrice - exitData.exitPrice) * exitData.quantity;
-
-      const newExit: Exit = {
-        ...exitData,
-        id: crypto.randomUUID(),
-        pnl,
-      };
-
-      const exits = [...trade.exits, newExit];
-      const totalExitedQty = exits.reduce((sum, e) => sum + e.quantity, 0);
-      const remainingQuantity = trade.quantity - totalExitedQty;
-      const totalPnl = exits.reduce((sum, e) => sum + e.pnl, 0);
-      const bookedProfit = exits.reduce((sum, e) => sum + e.pnl, 0);
-
-      let status: Trade['status'] = 'OPEN';
-      if (remainingQuantity === 0) status = 'CLOSED';
-      else if (totalExitedQty > 0) status = 'PARTIAL';
-
-      return {
-        ...trade,
-        exits,
-        status,
-        totalPnl,
-        remainingQuantity,
-        bookedProfit,
-      };
-    });
-
-    saveTrades(updatedTrades);
+    try {
+      const { error } = await supabase.from('trades').delete().eq('id', tradeId);
+      if (error) throw error;
+      toast.success('Trade deleted');
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to delete trade');
+      console.error('Delete trade error:', error);
+    }
   };
 
-  const deleteTrade = (tradeId: string) => {
-    saveTrades(trades.filter((t) => t.id !== tradeId));
+  const deleteExit = async (tradeId: string, exitId: string) => {
+    if (!user) return;
+
+    const trade = trades.find((t) => t.id === tradeId);
+    if (!trade) return;
+
+    const exitToDelete = trade.exits.find((e) => e.id === exitId);
+    if (!exitToDelete) return;
+
+    try {
+      const { error: deleteError } = await supabase.from('exits').delete().eq('id', exitId);
+      if (deleteError) throw deleteError;
+
+      const remainingExits = trade.exits.filter((e) => e.id !== exitId);
+      const totalExitedQty = remainingExits.reduce((sum, e) => sum + e.quantity, 0);
+      const newRemainingQty = trade.quantity - totalExitedQty;
+      const newBookedProfit = remainingExits.reduce((sum, e) => sum + e.pnl, 0);
+      const newTotalPnl = newBookedProfit;
+
+      let newStatus: 'OPEN' | 'PARTIAL' | 'CLOSED' = 'OPEN';
+      if (newRemainingQty === 0) newStatus = 'CLOSED';
+      else if (totalExitedQty > 0) newStatus = 'PARTIAL';
+
+      const { error: updateError } = await supabase
+        .from('trades')
+        .update({
+          remaining_quantity: newRemainingQty,
+          booked_profit: newBookedProfit,
+          total_pnl: newTotalPnl,
+          status: newStatus,
+        })
+        .eq('id', tradeId);
+
+      if (updateError) throw updateError;
+
+      toast.success('Exit deleted');
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to delete exit');
+      console.error('Delete exit error:', error);
+    }
   };
 
-  const deleteExit = (tradeId: string, exitId: string) => {
-    const updatedTrades = trades.map((trade) => {
-      if (trade.id !== tradeId) return trade;
+  const updateCurrentPrice = async (tradeId: string, currentPrice: number | null) => {
+    if (!user) return;
 
-      const exits = trade.exits.filter((e) => e.id !== exitId);
-      const totalExitedQty = exits.reduce((sum, e) => sum + e.quantity, 0);
-      const remainingQuantity = trade.quantity - totalExitedQty;
-      const totalPnl = exits.reduce((sum, e) => sum + e.pnl, 0);
-      const bookedProfit = exits.reduce((sum, e) => sum + e.pnl, 0);
+    try {
+      const { error } = await supabase
+        .from('trades')
+        .update({ current_price: currentPrice })
+        .eq('id', tradeId);
 
-      let status: Trade['status'] = 'OPEN';
-      if (remainingQuantity === 0) status = 'CLOSED';
-      else if (totalExitedQty > 0) status = 'PARTIAL';
-
-      return {
-        ...trade,
-        exits,
-        status,
-        totalPnl,
-        remainingQuantity,
-        bookedProfit,
-      };
-    });
-
-    saveTrades(updatedTrades);
+      if (error) throw error;
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to update price');
+      console.error('Update price error:', error);
+    }
   };
 
-  const updateCurrentPrice = (tradeId: string, currentPrice: number | null) => {
-    const updatedTrades = trades.map((trade) => {
-      if (trade.id !== tradeId) return trade;
-      return { ...trade, currentPrice };
-    });
-    saveTrades(updatedTrades);
-  };
+  const updateCurrentSL = async (tradeId: string, currentStopLoss: number | null) => {
+    if (!user) return;
 
-  const updateCurrentSL = (tradeId: string, currentStopLoss: number | null) => {
-    const updatedTrades = trades.map((trade) => {
-      if (trade.id !== tradeId) return trade;
-      return { ...trade, currentStopLoss };
-    });
-    saveTrades(updatedTrades);
+    try {
+      const { error } = await supabase
+        .from('trades')
+        .update({ current_stop_loss: currentStopLoss })
+        .eq('id', tradeId);
+
+      if (error) throw error;
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to update stop loss');
+      console.error('Update SL error:', error);
+    }
   };
 
   const getStats = () => {
@@ -124,27 +255,30 @@ export const useTrades = () => {
     const winningTrades = trades.filter((t) => t.status === 'CLOSED' && t.totalPnl > 0).length;
     const losingTrades = trades.filter((t) => t.status === 'CLOSED' && t.totalPnl < 0).length;
     const winRate = closedTrades > 0 ? (winningTrades / closedTrades) * 100 : 0;
-    
-    // Calculate unrealized P&L
+
     const unrealizedPnl = trades.reduce((sum, t) => {
       if (t.currentPrice && t.remainingQuantity > 0) {
-        return sum + (t.currentPrice - t.entryPrice) * t.remainingQuantity;
+        const pnl = t.tradeType === 'LONG'
+          ? (t.currentPrice - t.entryPrice) * t.remainingQuantity
+          : (t.entryPrice - t.currentPrice) * t.remainingQuantity;
+        return sum + pnl;
       }
       return sum;
     }, 0);
-    
-    // Total exposure (position size of open trades)
+
     const totalExposure = trades
       .filter((t) => t.status !== 'CLOSED')
       .reduce((sum, t) => sum + t.entryPrice * t.remainingQuantity, 0);
-    
-    // Total risk (based on stop loss)
+
     const totalRisk = trades
       .filter((t) => t.status !== 'CLOSED')
       .reduce((sum, t) => {
         const sl = t.currentStopLoss ?? t.setupStopLoss;
         if (sl) {
-          return sum + (t.entryPrice - sl) * t.remainingQuantity;
+          const risk = t.tradeType === 'LONG'
+            ? (t.entryPrice - sl) * t.remainingQuantity
+            : (sl - t.entryPrice) * t.remainingQuantity;
+          return sum + Math.max(0, risk);
         }
         return sum;
       }, 0);
@@ -165,6 +299,7 @@ export const useTrades = () => {
 
   return {
     trades,
+    loading,
     addTrade,
     addExit,
     deleteTrade,

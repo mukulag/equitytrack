@@ -14,7 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      exits: {
+        Row: {
+          created_at: string
+          exit_date: string
+          exit_price: number
+          id: string
+          pnl: number
+          quantity: number
+          trade_id: string
+        }
+        Insert: {
+          created_at?: string
+          exit_date: string
+          exit_price: number
+          id?: string
+          pnl?: number
+          quantity: number
+          trade_id: string
+        }
+        Update: {
+          created_at?: string
+          exit_date?: string
+          exit_price?: number
+          id?: string
+          pnl?: number
+          quantity?: number
+          trade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exits_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trades: {
+        Row: {
+          booked_profit: number
+          created_at: string
+          current_price: number | null
+          current_stop_loss: number | null
+          entry_date: string
+          entry_price: number
+          entry_time: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          remaining_quantity: number
+          setup_stop_loss: number | null
+          status: string
+          symbol: string
+          target: number | null
+          target_rpt: number | null
+          total_pnl: number
+          trade_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          booked_profit?: number
+          created_at?: string
+          current_price?: number | null
+          current_stop_loss?: number | null
+          entry_date: string
+          entry_price: number
+          entry_time?: string | null
+          id?: string
+          notes?: string | null
+          quantity: number
+          remaining_quantity: number
+          setup_stop_loss?: number | null
+          status?: string
+          symbol: string
+          target?: number | null
+          target_rpt?: number | null
+          total_pnl?: number
+          trade_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          booked_profit?: number
+          created_at?: string
+          current_price?: number | null
+          current_stop_loss?: number | null
+          entry_date?: string
+          entry_price?: number
+          entry_time?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          remaining_quantity?: number
+          setup_stop_loss?: number | null
+          status?: string
+          symbol?: string
+          target?: number | null
+          target_rpt?: number | null
+          total_pnl?: number
+          trade_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
