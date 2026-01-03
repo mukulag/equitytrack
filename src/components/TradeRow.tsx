@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2, Edit2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Trade } from '@/types/trade';
+import { Trade, TradeType } from '@/types/trade';
 import { AddExitDialog } from './AddExitDialog';
+import { EditTradeDialog } from './EditTradeDialog';
+import { EditExitDialog } from './EditExitDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -26,9 +28,27 @@ interface TradeRowProps {
   onDeleteExit: (tradeId: string, exitId: string) => void;
   onUpdateCurrentPrice: (tradeId: string, currentPrice: number | null) => void;
   onUpdateCurrentSL: (tradeId: string, currentSL: number | null) => void;
+  onEditTrade: (tradeId: string, updates: {
+    symbol: string;
+    tradeType: TradeType;
+    entryDate: string;
+    entryPrice: number;
+    quantity: number;
+    currentPrice: number | null;
+    setupStopLoss: number | null;
+    currentStopLoss: number | null;
+    target: number | null;
+    targetRPT: number | null;
+    notes: string | null;
+  }) => void;
+  onEditExit: (tradeId: string, exitId: string, updates: {
+    exitDate: string;
+    exitPrice: number;
+    quantity: number;
+  }) => void;
 }
 
-export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onUpdateCurrentSL }: TradeRowProps) => {
+export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onUpdateCurrentSL, onEditTrade, onEditExit }: TradeRowProps) => {
   const [expanded, setExpanded] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
   const [editingSL, setEditingSL] = useState(false);
@@ -191,8 +211,9 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </span>
         </td>
         <td className="p-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <AddExitDialog trade={trade} onAddExit={onAddExit} />
+            <EditTradeDialog trade={trade} onEditTrade={onEditTrade} />
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
@@ -246,14 +267,17 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             </td>
             <td></td>
             <td className="p-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                onClick={() => onDeleteExit(trade.id, exit.id)}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => onDeleteExit(trade.id, exit.id)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             </td>
           </tr>
         ))}

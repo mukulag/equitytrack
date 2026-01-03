@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useCallback } from 'react';
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, getStats } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats } = useTrades();
   const { signOut, user } = useAuth();
   const stats = getStats();
 
@@ -121,6 +121,8 @@ const Index = () => {
             onDeleteExit={deleteExit}
             onUpdateCurrentPrice={updateCurrentPrice}
             onUpdateCurrentSL={updateCurrentSL}
+            onEditTrade={editTrade}
+            onEditExit={editExit}
           />
         </div>
           </>

@@ -1,4 +1,4 @@
-import { Trade } from '@/types/trade';
+import { Trade, TradeType } from '@/types/trade';
 import { TradeRow } from './TradeRow';
 
 interface TradesTableProps {
@@ -8,9 +8,27 @@ interface TradesTableProps {
   onDeleteExit: (tradeId: string, exitId: string) => void;
   onUpdateCurrentPrice: (tradeId: string, currentPrice: number | null) => void;
   onUpdateCurrentSL: (tradeId: string, currentSL: number | null) => void;
+  onEditTrade: (tradeId: string, updates: {
+    symbol: string;
+    tradeType: TradeType;
+    entryDate: string;
+    entryPrice: number;
+    quantity: number;
+    currentPrice: number | null;
+    setupStopLoss: number | null;
+    currentStopLoss: number | null;
+    target: number | null;
+    targetRPT: number | null;
+    notes: string | null;
+  }) => void;
+  onEditExit: (tradeId: string, exitId: string, updates: {
+    exitDate: string;
+    exitPrice: number;
+    quantity: number;
+  }) => void;
 }
 
-export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onUpdateCurrentSL }: TradesTableProps) => {
+export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onUpdateCurrentSL, onEditTrade, onEditExit }: TradesTableProps) => {
   if (trades.length === 0) {
     return (
       <div className="glass-card rounded-xl p-12 text-center animate-fade-in">
@@ -54,6 +72,8 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
                 onDeleteExit={onDeleteExit}
                 onUpdateCurrentPrice={onUpdateCurrentPrice}
                 onUpdateCurrentSL={onUpdateCurrentSL}
+                onEditTrade={onEditTrade}
+                onEditExit={onEditExit}
               />
             ))}
           </tbody>
