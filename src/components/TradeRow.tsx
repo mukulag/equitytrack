@@ -109,11 +109,6 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             <span className="font-mono font-semibold text-primary">{trade.symbol}</span>
           </button>
         </td>
-        <td className="p-4">
-          <Badge variant="outline" className={cn('text-xs', trade.tradeType === 'LONG' ? 'border-success/50 text-success' : 'border-destructive/50 text-destructive')}>
-            {trade.tradeType}
-          </Badge>
-        </td>
         <td className="p-4 font-mono text-sm">{format(new Date(trade.entryDate), 'dd MMM')}</td>
         <td className="p-4 font-mono text-sm">{formatCurrency(trade.entryPrice)}</td>
         <td className="p-4">
@@ -169,13 +164,6 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             </button>
           )}
         </td>
-        <td className="p-4 font-mono text-sm">
-          {slPercent ? (
-            <span className={slPercent < 0 ? 'text-destructive' : 'text-success'}>
-              {slPercent.toFixed(1)}%
-            </span>
-          ) : '—'}
-        </td>
         <td className="p-4 font-mono text-sm text-muted-foreground">
           {trade.target ? formatCurrency(trade.target) : '—'}
         </td>
@@ -211,6 +199,11 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </span>
         </td>
         <td className="p-4">
+          <Badge variant="outline" className={cn('text-xs', trade.tradeType === 'LONG' ? 'border-success/50 text-success' : 'border-destructive/50 text-destructive')}>
+            {trade.tradeType}
+          </Badge>
+        </td>
+        <td className="p-4">
           <div className="flex items-center gap-1">
             <AddExitDialog trade={trade} onAddExit={onAddExit} />
             <EditTradeDialog trade={trade} onEditTrade={onEditTrade} />
@@ -244,7 +237,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
       {expanded &&
         trade.exits.map((exit) => (
           <tr key={exit.id} className="bg-accent/20 border-b border-border/30">
-            <td className="p-4 pl-12" colSpan={2}>
+            <td className="p-4 pl-12">
               <span className="text-sm text-muted-foreground">↳ Exit</span>
             </td>
             <td className="p-4 font-mono text-sm text-muted-foreground">
@@ -252,7 +245,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             </td>
             <td className="p-4 font-mono text-sm" colSpan={2}>{formatCurrency(exit.exitPrice)}</td>
             <td className="p-4 font-mono text-sm">{exit.quantity}</td>
-            <td className="p-4" colSpan={5}></td>
+            <td className="p-4" colSpan={4}></td>
             <td className="p-4">
               <span
                 className={cn(
@@ -265,7 +258,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
                 {formatCurrency(exit.pnl)}
               </span>
             </td>
-            <td></td>
+            <td colSpan={2}></td>
             <td className="p-4">
               <div className="flex items-center gap-1">
                 <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
