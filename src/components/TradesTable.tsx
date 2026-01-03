@@ -47,18 +47,17 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
           <thead>
             <tr className="border-b border-border bg-secondary/30">
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Symbol</th>
-              <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Type</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Date</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Entry</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">CMP</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Qty</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Setup SL</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Current SL</th>
-              <th className="text-left p-4 text-sm font-semibold text-muted-foreground">SL %</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Target</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Status</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Booked</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Unrealized</th>
+              <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Type</th>
               <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Actions</th>
             </tr>
           </thead>

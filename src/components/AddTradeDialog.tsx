@@ -161,18 +161,6 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                placeholder="0"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                required
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="setupStopLoss">Setup SL</Label>
               <Input
                 id="setupStopLoss"
@@ -193,6 +181,34 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 placeholder="Trailing SL"
                 value={currentStopLoss}
                 onChange={(e) => setCurrentStopLoss(e.target.value)}
+                className="bg-secondary/50 border-border font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="setupQuantity">Setup Qty</Label>
+              <Input
+                id="setupQuantity"
+                type="number"
+                value={entryPrice && setupStopLoss && parseFloat(entryPrice) !== parseFloat(setupStopLoss)
+                  ? Math.floor(parseFloat(targetRPT) / Math.abs(parseFloat(entryPrice) - parseFloat(setupStopLoss)))
+                  : ''}
+                readOnly
+                className="bg-secondary/30 border-border font-mono text-muted-foreground"
+                placeholder="Auto"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                placeholder="0"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                required
                 className="bg-secondary/50 border-border font-mono"
               />
             </div>
