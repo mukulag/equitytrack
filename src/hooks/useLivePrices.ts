@@ -20,6 +20,16 @@ export const useLivePrices = ({
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isFetchingRef = useRef(false);
+  
+  // Use refs to store latest values without causing re-renders
+  const tradesRef = useRef(trades);
+  const onPriceUpdateRef = useRef(onPriceUpdate);
+  
+  // Update refs when values change
+  useEffect(() => {
+    tradesRef.current = trades;
+    onPriceUpdateRef.current = onPriceUpdate;
+  }, [trades, onPriceUpdate]);
 
   const fetchPrices = useCallback(async () => {
     // Prevent concurrent fetches
@@ -27,8 +37,8 @@ export const useLivePrices = ({
       return;
     }
 
-    // Get unique symbols from open trades only
-    const openTrades = trades.filter((t) => t.status !== 'CLOSED');
+    // Get unique symbols from open trades only (using ref to get latest)
+    const openTrades = tradesRef.current.filter((t) => t.status !== 'CLOSED');
     const symbols = [...new Set(openTrades.map((t) => t.symbol))];
 
     if (symbols.length === 0) {
@@ -52,7 +62,7 @@ export const useLivePrices = ({
         for (const trade of openTrades) {
           const price = data.prices[trade.symbol];
           if (price !== null && price !== undefined && price !== trade.currentPrice) {
-            onPriceUpdate(trade.id, price);
+            onPriceUpdateRef.current(trade.id, price);
           }
         }
         setLastRefresh(new Date());
@@ -64,7 +74,7 @@ export const useLivePrices = ({
       setIsRefreshing(false);
       isFetchingRef.current = false;
     }
-  }, [trades, onPriceUpdate]);
+  }, []); // Empty deps - we use refs for latest values
 
   // Set up periodic refresh
   useEffect(() => {

@@ -92,7 +92,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
   return (
     <>
       <tr className="table-row-hover border-b border-border/50">
-        <td className="p-4">
+        <td className="p-4 sticky left-0 z-10 bg-background min-w-[120px]">
           <button
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-2 text-left"
@@ -109,9 +109,9 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             <span className="font-mono font-semibold text-primary">{trade.symbol}</span>
           </button>
         </td>
-        <td className="p-4 font-mono text-sm">{format(new Date(trade.entryDate), 'dd MMM')}</td>
-        <td className="p-4 font-mono text-sm">{formatCurrency(trade.entryPrice)}</td>
-        <td className="p-4">
+        <td className="p-4 font-mono text-sm sticky left-[120px] z-10 bg-background min-w-[100px]">{format(new Date(trade.entryDate), 'dd MMM')}</td>
+        <td className="p-4 font-mono text-sm sticky left-[220px] z-10 bg-background min-w-[100px]">{formatCurrency(trade.entryPrice)}</td>
+        <td className="p-4 sticky left-[320px] z-10 bg-background min-w-[100px]">
           {editingPrice ? (
             <Input
               type="number"
@@ -163,9 +163,6 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
               <Edit2 className="h-3 w-3 opacity-50" />
             </button>
           )}
-        </td>
-        <td className="p-4 font-mono text-sm text-muted-foreground">
-          {trade.target ? formatCurrency(trade.target) : '—'}
         </td>
         <td className="p-4">
           <Badge variant="outline" className={cn('text-xs', statusColors[trade.status])}>
@@ -237,15 +234,16 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
       {expanded &&
         trade.exits.map((exit) => (
           <tr key={exit.id} className="bg-accent/20 border-b border-border/30">
-            <td className="p-4 pl-12">
+            <td className="p-4 pl-12 sticky left-0 z-10 bg-accent/20 min-w-[120px]">
               <span className="text-sm text-muted-foreground">↳ Exit</span>
             </td>
-            <td className="p-4 font-mono text-sm text-muted-foreground">
+            <td className="p-4 font-mono text-sm text-muted-foreground sticky left-[120px] z-10 bg-accent/20 min-w-[100px]">
               {format(new Date(exit.exitDate), 'dd MMM')}
             </td>
-            <td className="p-4 font-mono text-sm" colSpan={2}>{formatCurrency(exit.exitPrice)}</td>
+            <td className="p-4 font-mono text-sm sticky left-[220px] z-10 bg-accent/20 min-w-[100px]">{formatCurrency(exit.exitPrice)}</td>
+            <td className="p-4 sticky left-[320px] z-10 bg-accent/20 min-w-[100px]"></td>
             <td className="p-4 font-mono text-sm">{exit.quantity}</td>
-            <td className="p-4" colSpan={4}></td>
+            <td className="p-4" colSpan={3}></td>
             <td className="p-4">
               <span
                 className={cn(

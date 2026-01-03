@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TradeType } from '@/types/trade';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AddTradeDialogProps {
   onAddTrade: (trade: {
@@ -43,12 +44,73 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
   const [entryPrice, setEntryPrice] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [currentPrice, setCurrentPrice] = useState('');
-  const [setupStopLoss, setSetupStopLoss] = useState('');
   const [currentStopLoss, setCurrentStopLoss] = useState('');
-  const [target, setTarget] = useState('');
   const [targetRPT, setTargetRPT] = useState('2000');
   const [notes, setNotes] = useState('');
+  const [cmp, setCmp] = useState<number | null>(null);
+  const [isFetchingCmp, setIsFetchingCmp] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch CMP as user types in symbol field
+  useEffect(() => {
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Reset CMP if symbol is empty
+    if (!symbol.trim()) {
+      setCmp(null);
+      return;
+    }
+
+    // Debounce the API call
+    debounceTimerRef.current = setTimeout(async () => {
+      const symbolToFetch = symbol.trim().toUpperCase();
+      if (!symbolToFetch) {
+        setCmp(null);
+        return;
+      }
+
+      setIsFetchingCmp(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-stock-price', {
+          body: { symbols: [symbolToFetch] },
+        });
+
+        if (error) {
+          console.error('Error fetching CMP:', error);
+          setCmp(null);
+        } else if (data?.prices && data.prices[symbolToFetch] !== null && data.prices[symbolToFetch] !== undefined) {
+          setCmp(data.prices[symbolToFetch]);
+        } else {
+          setCmp(null);
+        }
+      } catch (err) {
+        console.error('Error fetching CMP:', err);
+        setCmp(null);
+      } finally {
+        setIsFetchingCmp(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [symbol]);
+
+  // Reset CMP when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setCmp(null);
+      setSymbol('');
+    }
+  }, [open]);
+
+  // Auto-calculate Setup Quantity when Setup SL or CMP changes
+  // Note: This is calculated in the Setup Qty field directly, no need for separate state
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,10 +121,10 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
       entryDate,
       entryPrice: parseFloat(entryPrice),
       quantity: parseInt(quantity),
-      currentPrice: currentPrice ? parseFloat(currentPrice) : null,
-      setupStopLoss: setupStopLoss ? parseFloat(setupStopLoss) : null,
+      currentPrice: cmp !== null ? cmp : null,
+      setupStopLoss: null,
       currentStopLoss: currentStopLoss ? parseFloat(currentStopLoss) : null,
-      target: target ? parseFloat(target) : null,
+      target: null,
       targetRPT: parseFloat(targetRPT) || 2000,
       notes,
     });
@@ -72,12 +134,10 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
     setEntryDate(new Date().toISOString().split('T')[0]);
     setEntryPrice('');
     setQuantity('');
-    setCurrentPrice('');
-    setSetupStopLoss('');
     setCurrentStopLoss('');
-    setTarget('');
     setTargetRPT('2000');
     setNotes('');
+    setCmp(null);
     setOpen(false);
   };
 
@@ -97,14 +157,26 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="symbol">Symbol</Label>
-              <Input
-                id="symbol"
-                placeholder="e.g., HINDCOPPER"
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                required
-                className="bg-secondary/50 border-border font-mono uppercase"
-              />
+              <div className="relative">
+                <Input
+                  id="symbol"
+                  placeholder="e.g., HINDCOPPER"
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value)}
+                  required
+                  className="bg-secondary/50 border-border font-mono uppercase pr-20"
+                />
+                {isFetchingCmp && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    Loading...
+                  </span>
+                )}
+                {!isFetchingCmp && cmp !== null && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary">
+                    CMP: ₹{cmp.toFixed(2)}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="tradeType">Type</Label>
@@ -120,9 +192,9 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="entryDate">Entry Date</Label>
+              <Label htmlFor="entryDate">Date</Label>
               <Input
                 id="entryDate"
                 type="date"
@@ -133,7 +205,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="entryPrice">Entry Price</Label>
+              <Label htmlFor="entryPrice">Entry</Label>
               <Input
                 id="entryPrice"
                 type="number"
@@ -145,35 +217,11 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 className="bg-secondary/50 border-border font-mono"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="currentPrice">Current Price</Label>
-              <Input
-                id="currentPrice"
-                type="number"
-                step="0.01"
-                placeholder="LTP"
-                value={currentPrice}
-                onChange={(e) => setCurrentPrice(e.target.value)}
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="setupStopLoss">Setup SL</Label>
-              <Input
-                id="setupStopLoss"
-                type="number"
-                step="0.01"
-                placeholder="Original SL"
-                value={setupStopLoss}
-                onChange={(e) => setSetupStopLoss(e.target.value)}
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="currentStopLoss">Current SL</Label>
+              <Label htmlFor="currentStopLoss">SL</Label>
               <Input
                 id="currentStopLoss"
                 type="number"
@@ -185,23 +233,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="setupQuantity">Setup Qty</Label>
-              <Input
-                id="setupQuantity"
-                type="number"
-                value={entryPrice && setupStopLoss && parseFloat(entryPrice) !== parseFloat(setupStopLoss)
-                  ? Math.floor(parseFloat(targetRPT) / Math.abs(parseFloat(entryPrice) - parseFloat(setupStopLoss)))
-                  : ''}
-                readOnly
-                className="bg-secondary/30 border-border font-mono text-muted-foreground"
-                placeholder="Auto"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity</Label>
+              <Label htmlFor="quantity">Qty</Label>
               <Input
                 id="quantity"
                 type="number"
@@ -216,19 +248,36 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="target">Target Price</Label>
+              <Label htmlFor="positionSize">Position Size</Label>
               <Input
-                id="target"
+                id="positionSize"
                 type="number"
-                step="0.01"
-                placeholder="Target"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                className="bg-secondary/50 border-border font-mono"
+                value={entryPrice && quantity
+                  ? (parseFloat(entryPrice) * parseFloat(quantity)).toFixed(2)
+                  : ''}
+                readOnly
+                className="bg-secondary/30 border-border font-mono text-muted-foreground"
+                placeholder="Auto"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="targetRPT">Target RPT (₹)</Label>
+              <Label htmlFor="setupQuantity">Setup Qty</Label>
+              <Input
+                id="setupQuantity"
+                type="number"
+                value={cmp && currentStopLoss && targetRPT && cmp !== parseFloat(currentStopLoss)
+                  ? Math.floor(parseFloat(targetRPT) / Math.abs(cmp - parseFloat(currentStopLoss)))
+                  : ''}
+                readOnly
+                className="bg-secondary/30 border-border font-mono text-muted-foreground"
+                placeholder="Auto"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="targetRPT">RPT</Label>
               <Input
                 id="targetRPT"
                 type="number"

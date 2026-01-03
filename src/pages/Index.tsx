@@ -21,7 +21,7 @@ const Index = () => {
   const { isRefreshing, lastRefresh, refreshNow } = useLivePrices({
     trades,
     onPriceUpdate: handlePriceUpdate,
-    intervalMs: 60000, // Refresh every minute
+    intervalMs: 300000, // Refresh every 5 minutes
     enabled: !loading && trades.length > 0,
   });
 
