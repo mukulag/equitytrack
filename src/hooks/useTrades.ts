@@ -253,6 +253,152 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     }
   };
 
+  const editTrade = async (tradeId: string, updates: {
+    symbol: string;
+    tradeType: 'LONG' | 'SHORT';
+    entryDate: string;
+    entryPrice: number;
+    quantity: number;
+    currentPrice: number | null;
+    setupStopLoss: number | null;
+    currentStopLoss: number | null;
+    target: number | null;
+    targetRPT: number | null;
+    notes: string | null;
+  }) => {
+    if (!user) return;
+
+    const trade = trades.find((t) => t.id === tradeId);
+    if (!trade) return;
+
+    try {
+      // Calculate new remaining quantity based on exits
+      const totalExited = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
+      const newRemainingQty = updates.quantity - totalExited;
+
+      if (newRemainingQty < 0) {
+        toast.error('Quantity cannot be less than already exited shares');
+        return;
+      }
+
+      // Recalculate booked profit with new entry price
+      const newBookedProfit = trade.exits.reduce((sum, exit) => {
+        const pnl = updates.tradeType === 'LONG'
+          ? (exit.exitPrice - updates.entryPrice) * exit.quantity
+          : (updates.entryPrice - exit.exitPrice) * exit.quantity;
+        return sum + pnl;
+      }, 0);
+
+      let newStatus: 'OPEN' | 'PARTIAL' | 'CLOSED' = 'OPEN';
+      if (newRemainingQty === 0) newStatus = 'CLOSED';
+      else if (totalExited > 0) newStatus = 'PARTIAL';
+
+      const { error } = await supabase
+        .from('trades')
+        .update({
+          symbol: updates.symbol,
+          trade_type: updates.tradeType,
+          entry_date: updates.entryDate,
+          entry_price: updates.entryPrice,
+          quantity: updates.quantity,
+          current_price: updates.currentPrice,
+          setup_stop_loss: updates.setupStopLoss,
+          current_stop_loss: updates.currentStopLoss,
+          target: updates.target,
+          target_rpt: updates.targetRPT,
+          notes: updates.notes,
+          remaining_quantity: newRemainingQty,
+          booked_profit: newBookedProfit,
+          total_pnl: newBookedProfit,
+          status: newStatus,
+        })
+        .eq('id', tradeId);
+
+      if (error) throw error;
+
+      // Also update exit PnL values if entry price changed
+      if (updates.entryPrice !== trade.entryPrice) {
+        for (const exit of trade.exits) {
+          const newPnl = updates.tradeType === 'LONG'
+            ? (exit.exitPrice - updates.entryPrice) * exit.quantity
+            : (updates.entryPrice - exit.exitPrice) * exit.quantity;
+
+          await supabase
+            .from('exits')
+            .update({ pnl: newPnl })
+            .eq('id', exit.id);
+        }
+      }
+
+      toast.success('Trade updated successfully');
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to update trade');
+      console.error('Edit trade error:', error);
+    }
+  };
+
+  const editExit = async (tradeId: string, exitId: string, updates: {
+    exitDate: string;
+    exitPrice: number;
+    quantity: number;
+  }) => {
+    if (!user) return;
+
+    const trade = trades.find((t) => t.id === tradeId);
+    if (!trade) return;
+
+    const existingExit = trade.exits.find((e) => e.id === exitId);
+    if (!existingExit) return;
+
+    try {
+      // Calculate new PnL
+      const newPnl = trade.tradeType === 'LONG'
+        ? (updates.exitPrice - trade.entryPrice) * updates.quantity
+        : (trade.entryPrice - updates.exitPrice) * updates.quantity;
+
+      const { error: exitError } = await supabase
+        .from('exits')
+        .update({
+          exit_date: updates.exitDate,
+          exit_price: updates.exitPrice,
+          quantity: updates.quantity,
+          pnl: newPnl,
+        })
+        .eq('id', exitId);
+
+      if (exitError) throw exitError;
+
+      // Recalculate trade totals
+      const otherExits = trade.exits.filter((e) => e.id !== exitId);
+      const totalExitedQty = otherExits.reduce((sum, e) => sum + e.quantity, 0) + updates.quantity;
+      const newRemainingQty = trade.quantity - totalExitedQty;
+      const newBookedProfit = otherExits.reduce((sum, e) => sum + e.pnl, 0) + newPnl;
+
+      let newStatus: 'OPEN' | 'PARTIAL' | 'CLOSED' = 'OPEN';
+      if (newRemainingQty === 0) newStatus = 'CLOSED';
+      else if (totalExitedQty > 0) newStatus = 'PARTIAL';
+
+      const { error: updateError } = await supabase
+        .from('trades')
+        .update({
+          remaining_quantity: newRemainingQty,
+          booked_profit: newBookedProfit,
+          total_pnl: newBookedProfit,
+          status: newStatus,
+        })
+        .eq('id', tradeId);
+
+      if (updateError) throw updateError;
+
+      toast.success('Exit updated successfully');
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to update exit');
+      console.error('Edit exit error:', error);
+    }
+  };
+
   const getStats = () => {
     const totalTrades = trades.length;
     const openTrades = trades.filter((t) => t.status !== 'CLOSED').length;
@@ -312,6 +458,8 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     deleteExit,
     updateCurrentPrice,
     updateCurrentSL,
+    editTrade,
+    editExit,
     getStats,
   };
 };

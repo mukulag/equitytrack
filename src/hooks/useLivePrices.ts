@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Trade } from '@/types/trade';
-import { toast } from 'sonner';
 
 interface UseLivePricesOptions {
   trades: Trade[];
@@ -20,23 +19,27 @@ export const useLivePrices = ({
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingRef = useRef(false);
 
   const fetchPrices = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      return;
+    }
+
     // Get unique symbols from open trades only
     const openTrades = trades.filter((t) => t.status !== 'CLOSED');
     const symbols = [...new Set(openTrades.map((t) => t.symbol))];
 
     if (symbols.length === 0) {
-      console.log('No open trades to fetch prices for');
       return;
     }
 
+    isFetchingRef.current = true;
     setIsRefreshing(true);
     setError(null);
 
     try {
-      console.log('Fetching live prices for:', symbols);
-
       const { data, error: fnError } = await supabase.functions.invoke('fetch-stock-price', {
         body: { symbols },
       });
@@ -46,28 +49,20 @@ export const useLivePrices = ({
       }
 
       if (data?.prices) {
-        let updatedCount = 0;
-        
         for (const trade of openTrades) {
           const price = data.prices[trade.symbol];
           if (price !== null && price !== undefined && price !== trade.currentPrice) {
-            await onPriceUpdate(trade.id, price);
-            updatedCount++;
+            onPriceUpdate(trade.id, price);
           }
         }
-
         setLastRefresh(new Date());
-        
-        if (updatedCount > 0) {
-          toast.success(`Updated prices for ${updatedCount} trade(s)`);
-        }
       }
     } catch (err: any) {
       console.error('Error fetching live prices:', err);
       setError(err.message || 'Failed to fetch prices');
-      toast.error('Failed to fetch live prices');
     } finally {
       setIsRefreshing(false);
+      isFetchingRef.current = false;
     }
   }, [trades, onPriceUpdate]);
 
@@ -81,13 +76,14 @@ export const useLivePrices = ({
       return;
     }
 
-    // Initial fetch
-    fetchPrices();
+    // Initial fetch after a short delay
+    const initialTimeout = setTimeout(fetchPrices, 1000);
 
     // Set up interval
     intervalRef.current = setInterval(fetchPrices, intervalMs);
 
     return () => {
+      clearTimeout(initialTimeout);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
