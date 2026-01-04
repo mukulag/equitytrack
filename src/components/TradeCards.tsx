@@ -22,12 +22,12 @@ export const TradeCards = ({ trades }: { trades: Trade[] }) => {
           <summary className="flex items-center justify-between cursor-pointer">
             <div>
               <div className="font-mono font-semibold text-primary">{t.symbol}</div>
-              <div className="text-xs text-muted-foreground">Entry: {formatCurrency(t.entryPrice)}</div>
+              <div className="text-xs text-muted-foreground mt-1">Qty: {t.remainingQuantity}/{t.quantity}</div>
             </div>
 
             <div className="text-right">
               <div className="font-semibold">{t.currentPrice ? formatCurrency(t.currentPrice) : '—'}</div>
-              <div className="text-xs text-muted-foreground">{t.remainingQuantity}/{t.quantity}</div>
+              <div className="text-xs text-muted-foreground mt-1">Entry: {formatCurrency(t.entryPrice)}</div>
             </div>
           </summary>
 
