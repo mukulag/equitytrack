@@ -92,22 +92,29 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
   return (
     <>
       <tr className="table-row-hover border-b border-border/50">
-        <td className="p-4 md:sticky md:left-0 md:z-10 bg-background min-w-[120px]">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-2 text-left"
-          >
-            {trade.exits.length > 0 ? (
-              expanded ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        <td className="p-4 sticky left-0 z-10 bg-background min-w-[120px]">
+          <div className="relative">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-2 text-left"
+            >
+              {trade.exits.length > 0 ? (
+                expanded ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )
               ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )
-            ) : (
-              <span className="w-4" />
-            )}
-            <span className="font-mono font-semibold text-primary">{trade.symbol}</span>
-          </button>
+                <span className="w-4" />
+              )}
+              <span className="font-mono font-semibold text-primary">{trade.symbol}</span>
+            </button>
+
+            {/* Chevron separator to indicate sticky column boundary */}
+            <span className="hidden md:flex absolute right-[-8px] top-1/2 -translate-y-1/2 items-center justify-center h-6 w-6 bg-gradient-to-r from-transparent to-secondary/30 rounded-l pl-1 pointer-events-none">
+              <ChevronRight className="h-3 w-3 opacity-60" />
+            </span>
+          </div>
         </td>
         <td className="p-4 font-mono text-sm md:sticky md:left-[120px] md:z-10 bg-background min-w-[100px]">{format(new Date(trade.entryDate), 'dd MMM')}</td>
         <td className="p-4 font-mono text-sm md:sticky md:left-[220px] md:z-10 bg-background min-w-[100px]">{formatCurrency(trade.entryPrice)}</td>
@@ -234,7 +241,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
       {expanded &&
         trade.exits.map((exit) => (
           <tr key={exit.id} className="bg-accent/20 border-b border-border/30">
-            <td className="p-4 pl-12 md:sticky md:left-0 md:z-10 bg-accent/20 min-w-[120px]">
+            <td className="p-4 pl-12 sticky left-0 z-10 bg-accent/20 min-w-[120px]">
               <span className="text-sm text-muted-foreground">↳ Exit</span>
             </td>
             <td className="p-4 font-mono text-sm text-muted-foreground md:sticky md:left-[120px] md:z-10 bg-accent/20 min-w-[100px]">
