@@ -173,7 +173,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 )}
                 {!isFetchingCmp && cmp !== null && (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary">
-                    CMP: ₹{cmp.toFixed(2)}
+                    ₹{cmp.toFixed(2)}
                   </span>
                 )}
               </div>
