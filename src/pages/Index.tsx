@@ -5,6 +5,7 @@ import { StatsCard } from '@/components/StatsCard';
 import { AddTradeDialog } from '@/components/AddTradeDialog';
 import { TradesTable } from '@/components/TradesTable';
 import { LivePriceIndicator } from '@/components/LivePriceIndicator';
+import { Footer } from '@/components/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useCallback } from 'react';
@@ -35,7 +36,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-lg sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
@@ -64,7 +65,7 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-8 flex-1">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-pulse text-muted-foreground">Loading trades...</div>
@@ -128,6 +129,8 @@ const Index = () => {
           </>
         )}
       </main>
+
+      <Footer paypalEmail="YOUR_PAYPAL_EMAIL" />
     </div>
   );
 };
