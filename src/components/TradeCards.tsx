@@ -32,11 +32,13 @@ export const TradeCards = ({ trades }: { trades: Trade[] }) => {
             </div>
 
             <div className="text-right">
-              <div className="text-xs text-muted-foreground">CMP</div>
-              <div className={isCmpAbove ? 'text-success font-semibold' : isCmpBelow ? 'text-destructive font-semibold' : 'font-semibold'}>
-                {t.currentPrice ? formatCurrency(t.currentPrice) : '—'}
+              <div className="text-xs whitespace-nowrap">
+                <span className="text-muted-foreground mr-1">CMP</span>
+                <span className={isCmpAbove ? 'text-success font-semibold' : isCmpBelow ? 'text-destructive font-semibold' : 'font-semibold'}>
+                  {t.currentPrice ? formatCurrency(t.currentPrice) : '—'}
+                </span>
               </div>
-              <div className="text-xs text-muted-foreground mt-1">Entry: {formatCurrency(t.entryPrice)}</div>
+              <div className="text-xs text-muted-foreground mt-1 whitespace-nowrap">Entry: {formatCurrency(t.entryPrice)}</div>
             </div>
           </summary>
 
