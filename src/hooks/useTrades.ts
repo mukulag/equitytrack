@@ -425,12 +425,14 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     const totalRisk = trades
       .filter((t) => t.status !== 'CLOSED')
       .reduce((sum, t) => {
-        const sl = t.currentStopLoss ?? t.setupStopLoss;
-        if (sl) {
+        const sl = t.currentStopLoss; // Use current SL only
+        // If there's a current SL defined, compute risk; otherwise treat as risk-free (0)
+        if (sl !== undefined && sl !== null) {
           const risk = t.tradeType === 'LONG'
             ? (t.entryPrice - sl) * t.remainingQuantity
             : (sl - t.entryPrice) * t.remainingQuantity;
-          return sum + Math.max(0, risk);
+          // Allow negative risk values (do not clamp to 0)
+          return sum + risk;
         }
         return sum;
       }, 0);

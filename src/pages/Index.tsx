@@ -83,7 +83,7 @@ const Index = () => {
             title="Total Risk"
             value={formatCurrency(stats.totalRisk)}
             icon={AlertTriangle}
-            trend={stats.totalRisk > 0 ? 'down' : 'neutral'}
+            trend={stats.totalRisk > 0 ? 'down' : stats.totalRisk < 0 ? 'up' : 'neutral'}
           />
           <StatsCard
             title="Unrealized P&L"
