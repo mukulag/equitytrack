@@ -16,7 +16,7 @@ const feedbackSchema = z.object({
   message: z.string().trim().min(1, "Message is required").max(2000, "Message must be less than 2000 characters"),
 });
 
-export const FeedbackForm = () => {
+export const FeedbackForm = ({ onSuccess }: { onSuccess?: () => void }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState<string>('');
@@ -48,6 +48,7 @@ export const FeedbackForm = () => {
       setEmail('');
       setCategory('');
       setMessage('');
+      onSuccess?.();
     } catch (error) {
       console.error('Error submitting feedback:', error);
       toast.error('Failed to submit feedback. Please try again.');

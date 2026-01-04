@@ -10,21 +10,24 @@ interface StatsCardProps {
 }
 
 export const StatsCard = ({ title, value, icon: Icon, trend, subtitle }: StatsCardProps) => {
+  // Normalize value for layout: split leading sign if present so sign can be styled separately
+  const valueStr = String(value);
+  const isNegative = /^[-−]/.test(valueStr);
+  const sign = isNegative ? valueStr[0] : '';
+  const absValue = isNegative ? valueStr.slice(1) : valueStr;
+
   return (
-    <div className="stat-card animate-fade-in">
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p
-            className={cn(
-              'text-2xl font-bold font-mono tracking-tight',
-              trend === 'up' && 'profit-text',
-              trend === 'down' && 'loss-text'
-            )}
-          >
-            {value}
-          </p>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+    <div className="stat-card animate-fade-in h-full flex items-center">
+      <div className="flex items-center justify-between w-full">
+        <div className="flex-1 flex flex-col justify-between">
+          <p className="text-sm font-medium text-muted-foreground whitespace-nowrap overflow-hidden truncate h-6">{title}</p>
+
+          <div className={cn('flex items-baseline gap-1', trend === 'up' && 'profit-text', trend === 'down' && 'loss-text')}>
+            {isNegative && <span className="text-lg font-medium leading-none">{sign}</span>}
+            <span className="text-xl sm:text-2xl font-bold leading-tight">{absValue}</span>
+          </div>
+
+          <p className="text-xs text-muted-foreground h-4">{subtitle ?? ''}</p>
         </div>
         <div
           className={cn(

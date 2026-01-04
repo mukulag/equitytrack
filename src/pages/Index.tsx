@@ -1,4 +1,6 @@
 import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
+import React from 'react';
 import { useTrades } from '@/hooks/useTrades';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { StatsCard } from '@/components/StatsCard';
@@ -57,9 +59,15 @@ const Index = () => {
                 onRefresh={refreshNow}
               />
               <AddTradeDialog onAddTrade={addTrade} />
+
+              {/* Theme toggle (hidden on small screens) */}
+              <div className="hidden md:block">
+                <ThemeToggle />
+              </div>
+
               <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
                 <LogOut className="h-4 w-4" />
-              </Button>
+              </Button> 
             </div>
           </div>
         </div>
@@ -73,7 +81,7 @@ const Index = () => {
         ) : (
           <>
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 auto-rows-fr">
           <StatsCard
             title="Total Exposure"
             value={formatCurrency(stats.totalExposure)}
