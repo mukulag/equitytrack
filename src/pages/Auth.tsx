@@ -185,7 +185,7 @@ const Auth = () => {
           </CardContent>
         </Card>
       </div>
-      <Footer paypalEmail="YOUR_PAYPAL_EMAIL" />
+      <Footer paypalEmail="mukulag@gmail.com" />
     </div>
   );
 };

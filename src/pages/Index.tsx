@@ -130,7 +130,7 @@ const Index = () => {
         )}
       </main>
 
-      <Footer paypalEmail="YOUR_PAYPAL_EMAIL" />
+      <Footer paypalEmail="mukulag@gmail.com" />
     </div>
   );
 };

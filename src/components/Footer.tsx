@@ -6,7 +6,7 @@ interface FooterProps {
   paypalEmail?: string;
 }
 
-export const Footer = ({ paypalEmail = "YOUR_PAYPAL_EMAIL" }: FooterProps) => {
+export const Footer = ({ paypalEmail = "mukulag@gmail.com" }: FooterProps) => {
   const paypalDonateUrl = `https://www.paypal.com/donate/?business=${encodeURIComponent(paypalEmail)}&currency_code=INR`;
 
   return (
