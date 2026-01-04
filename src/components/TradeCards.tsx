@@ -27,18 +27,18 @@ export const TradeCards = ({ trades }: { trades: Trade[] }) => {
         <details key={t.id} className="glass-card rounded-lg border p-3">
           <summary className="flex items-center justify-between cursor-pointer">
             <div>
-              <div className="font-mono font-semibold text-primary">{t.symbol}</div>
-              <div className="text-xs text-muted-foreground mt-1">Qty: {t.remainingQuantity}/{t.quantity}</div>
+              <div className="font-mono font-semibold text-primary text-sm">{t.symbol}</div>
+              <div className="text-sm text-muted-foreground mt-1">Qty: {t.remainingQuantity}/{t.quantity}</div>
             </div>
 
             <div className="text-right">
-              <div className="text-xs whitespace-nowrap">
-                <span className="text-muted-foreground mr-1">CMP</span>
-                <span className={isCmpAbove ? 'text-success font-semibold' : isCmpBelow ? 'text-destructive font-semibold' : 'font-semibold'}>
+              <div className="text-sm whitespace-nowrap">
+                <span className="text-muted-foreground mr-1 text-sm">CMP</span>
+                <span className={isCmpAbove ? 'text-success font-semibold text-sm' : isCmpBelow ? 'text-destructive font-semibold text-sm' : 'font-semibold text-sm'}>
                   {t.currentPrice ? formatCurrency(t.currentPrice) : '—'}
                 </span>
               </div>
-              <div className="text-xs text-muted-foreground mt-1 whitespace-nowrap">Entry: {formatCurrency(t.entryPrice)}</div>
+              <div className="text-sm text-muted-foreground mt-1 whitespace-nowrap">Entry: {formatCurrency(t.entryPrice)}</div>
             </div>
           </summary>
 
