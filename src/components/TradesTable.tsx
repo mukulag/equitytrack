@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Trade, TradeType } from '@/types/trade';
 import { TradeRow } from './TradeRow';
 import TradeCards from './TradeCards';
-import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserPreference, setUserPreference } from '@/lib/userPreferences';
 
 interface TradesTableProps {
   trades: Trade[];
@@ -44,8 +42,6 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
     );
   }
 
-  const { user } = useAuth();
-
   const [mobileView, setMobileView] = useState<'table' | 'cards'>(() => {
     if (typeof window !== 'undefined') {
       const v = localStorage.getItem('tradesMobileView');
@@ -54,36 +50,12 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
     return 'table';
   });
 
-  // Load user preference from server when signed in
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (!user) return;
-      try {
-        const val = await fetchUserPreference(user.id, 'trades_mobile_view');
-        if (!mounted) return;
-        if (val === 'cards' || val === 'table') {
-          setMobileView(val);
-          localStorage.setItem('tradesMobileView', val);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    load();
-    return () => { mounted = false; };
-  }, [user]);
-
-  // Persist preference locally and server-side (if signed in)
+  // Persist preference locally
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('tradesMobileView', mobileView);
     }
-
-    if (user) {
-      setUserPreference(user.id, 'trades_mobile_view', mobileView).catch((e) => console.error(e));
-    }
-  }, [mobileView, user]);
+  }, [mobileView]);
 
   return (
     <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
