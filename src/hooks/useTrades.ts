@@ -451,6 +451,63 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     };
   };
 
+  const importKiteTrades = async (kiteOrders: any[]) => {
+    if (!user) return { imported: 0, skipped: 0 };
+
+    // Filter only COMPLETE BUY orders (entry trades)
+    const buyOrders = kiteOrders.filter(
+      (order) => order.status === 'COMPLETE' && order.transaction_type === 'BUY'
+    );
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const order of buyOrders) {
+      try {
+        // Check if trade already exists with same symbol and entry date
+        const orderDate = order.order_timestamp?.split(' ')[0] || new Date().toISOString().split('T')[0];
+        
+        const { data: existing } = await supabase
+          .from('trades')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('symbol', order.tradingsymbol)
+          .eq('entry_date', orderDate)
+          .eq('entry_price', order.average_price)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        const { error } = await supabase.from('trades').insert({
+          user_id: user.id,
+          symbol: order.tradingsymbol,
+          trade_type: 'LONG', // BUY orders are LONG
+          entry_date: orderDate,
+          entry_price: order.average_price,
+          quantity: order.filled_quantity || order.quantity,
+          remaining_quantity: order.filled_quantity || order.quantity,
+          notes: `Imported from Kite - Order ID: ${order.order_id}`,
+        });
+
+        if (error) throw error;
+        imported++;
+      } catch (error) {
+        console.error('Failed to import order:', order, error);
+        skipped++;
+      }
+    }
+
+    if (imported > 0) {
+      toast.success(`Imported ${imported} trades from Kite`);
+      fetchTrades();
+    }
+
+    return { imported, skipped };
+  };
+
   return {
     trades,
     loading,
@@ -463,5 +520,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     editTrade,
     editExit,
     getStats,
+    importKiteTrades,
+    refetch: fetchTrades,
   };
 };
