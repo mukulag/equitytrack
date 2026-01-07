@@ -41,13 +41,20 @@ const Index = () => {
   const [kiteToken, setKiteToken] = useState<string | null>(null);
   const [kiteOrders, setKiteOrders] = useState<any[] | null>(null);
   const [kiteError, setKiteError] = useState<string | null>(null);
+  const [kiteLoading, setKiteLoading] = useState(false);
+
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
   // Handle Kite login redirect
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestToken = params.get('request_token');
     if (requestToken && !kiteToken) {
-      fetch('/kite/token', {
+      setKiteLoading(true);
+      // Clear the URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request_token: requestToken })
@@ -57,17 +64,30 @@ const Index = () => {
           if (data.access_token) {
             setKiteToken(data.access_token);
             // Fetch orders
-            fetch(`/kite/orders?access_token=${data.access_token}`)
+            return fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=orders&access_token=${data.access_token}`)
               .then(res => res.json())
-              .then(orderData => setKiteOrders(orderData.data || orderData))
-              .catch(err => setKiteError('Failed to fetch orders'));
+              .then(orderData => setKiteOrders(orderData.orders || []))
+              .catch(() => setKiteError('Failed to fetch orders'));
           } else {
             setKiteError(data.error || 'Failed to get access token');
           }
         })
-        .catch(() => setKiteError('Failed to get access token'));
+        .catch(() => setKiteError('Failed to get access token'))
+        .finally(() => setKiteLoading(false));
     }
-  }, [kiteToken]);
+  }, [kiteToken, SUPABASE_URL]);
+
+  const handleKiteLogin = async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=login-url`);
+      const data = await res.json();
+      if (data.login_url) {
+        window.location.href = data.login_url;
+      }
+    } catch {
+      setKiteError('Failed to get login URL');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -108,10 +128,10 @@ const Index = () => {
       <main className="container mx-auto px-6 py-8 flex-1">
         {/* Kite Connect Button and Data */}
         <div className="mb-6">
-          <Button onClick={() => { window.location.href = '/kite/login'; }}>
-            Connect Kite Account
+          <Button onClick={handleKiteLogin} disabled={kiteLoading || !!kiteToken}>
+            {kiteLoading ? 'Connecting...' : kiteToken ? 'Connected to Kite' : 'Connect Kite Account'}
           </Button>
-          {kiteError && <div className="text-red-500 mt-2">{kiteError}</div>}
+          {kiteError && <div className="text-destructive mt-2">{kiteError}</div>}
           {kiteOrders && (
             <div className="mt-4">
               <h3 className="font-semibold mb-2">Kite Orders</h3>
