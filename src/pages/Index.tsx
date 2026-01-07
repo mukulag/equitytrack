@@ -1,6 +1,6 @@
-import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut, Download } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useTrades } from '@/hooks/useTrades';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { StatsCard } from '@/components/StatsCard';
@@ -10,10 +10,9 @@ import { LivePriceIndicator } from '@/components/LivePriceIndicator';
 import { Footer } from '@/components/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { useCallback } from 'react';
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats, importKiteTrades } = useTrades();
   const { signOut, user } = useAuth();
   const stats = getStats();
 
@@ -42,6 +41,7 @@ const Index = () => {
   const [kiteOrders, setKiteOrders] = useState<any[] | null>(null);
   const [kiteError, setKiteError] = useState<string | null>(null);
   const [kiteLoading, setKiteLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -89,6 +89,16 @@ const Index = () => {
     }
   };
 
+  const handleImportTrades = async () => {
+    if (!kiteOrders || kiteOrders.length === 0) return;
+    setImporting(true);
+    try {
+      await importKiteTrades(kiteOrders);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -126,18 +136,18 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8 flex-1">
-        {/* Kite Connect Button and Data */}
-        <div className="mb-6">
-          <Button onClick={handleKiteLogin} disabled={kiteLoading || !!kiteToken}>
+        {/* Kite Connect Button and Import */}
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <Button onClick={handleKiteLogin} disabled={kiteLoading || !!kiteToken} variant="outline">
             {kiteLoading ? 'Connecting...' : kiteToken ? 'Connected to Kite' : 'Connect Kite Account'}
           </Button>
-          {kiteError && <div className="text-destructive mt-2">{kiteError}</div>}
-          {kiteOrders && (
-            <div className="mt-4">
-              <h3 className="font-semibold mb-2">Kite Orders</h3>
-              <pre className="bg-muted p-2 rounded text-xs overflow-x-auto max-h-64">{JSON.stringify(kiteOrders, null, 2)}</pre>
-            </div>
+          {kiteToken && kiteOrders && kiteOrders.length > 0 && (
+            <Button onClick={handleImportTrades} disabled={importing}>
+              <Download className="h-4 w-4 mr-2" />
+              {importing ? 'Importing...' : `Import ${kiteOrders.filter(o => o.status === 'COMPLETE' && o.transaction_type === 'BUY').length} Trades`}
+            </Button>
           )}
+          {kiteError && <span className="text-destructive text-sm">{kiteError}</span>}
         </div>
 
         {loading ? (
