@@ -1,6 +1,6 @@
 import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
-import React from 'react';
+import React, { useState } from 'react';
 import { useTrades } from '@/hooks/useTrades';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { StatsCard } from '@/components/StatsCard';
@@ -36,6 +36,38 @@ const Index = () => {
       maximumFractionDigits: 0,
     }).format(value);
   };
+
+  // Kite Connect integration state
+  const [kiteToken, setKiteToken] = useState<string | null>(null);
+  const [kiteOrders, setKiteOrders] = useState<any[] | null>(null);
+  const [kiteError, setKiteError] = useState<string | null>(null);
+
+  // Handle Kite login redirect
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestToken = params.get('request_token');
+    if (requestToken && !kiteToken) {
+      fetch('/kite/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request_token: requestToken })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.access_token) {
+            setKiteToken(data.access_token);
+            // Fetch orders
+            fetch(`/kite/orders?access_token=${data.access_token}`)
+              .then(res => res.json())
+              .then(orderData => setKiteOrders(orderData.data || orderData))
+              .catch(err => setKiteError('Failed to fetch orders'));
+          } else {
+            setKiteError(data.error || 'Failed to get access token');
+          }
+        })
+        .catch(() => setKiteError('Failed to get access token'));
+    }
+  }, [kiteToken]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -74,6 +106,20 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8 flex-1">
+        {/* Kite Connect Button and Data */}
+        <div className="mb-6">
+          <Button onClick={() => { window.location.href = '/kite/login'; }}>
+            Connect Kite Account
+          </Button>
+          {kiteError && <div className="text-red-500 mt-2">{kiteError}</div>}
+          {kiteOrders && (
+            <div className="mt-4">
+              <h3 className="font-semibold mb-2">Kite Orders</h3>
+              <pre className="bg-muted p-2 rounded text-xs overflow-x-auto max-h-64">{JSON.stringify(kiteOrders, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-pulse text-muted-foreground">Loading trades...</div>
