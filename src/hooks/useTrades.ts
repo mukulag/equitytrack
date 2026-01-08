@@ -485,6 +485,8 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           quantity: holding.quantity,
           remaining_quantity: holding.quantity,
           current_price: holding.last_price,
+          setup_stop_loss: holding.prev_day_low || null,
+          current_stop_loss: holding.prev_day_low || null,
           notes: `Imported from Kite Holdings - ISIN: ${holding.isin || 'N/A'}`,
         });
 
