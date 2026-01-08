@@ -144,7 +144,7 @@ serve(async (req) => {
       });
     }
 
-    // Action: Fetch holdings (current portfolio positions)
+    // Action: Fetch holdings (current portfolio positions) with previous day low
     if (action === 'holdings') {
       const accessToken = url.searchParams.get('access_token');
       
@@ -175,7 +175,49 @@ serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ holdings: data.data }), {
+      // Fetch previous day's low for each holding
+      const holdingsWithPrevLow = await Promise.all(
+        (data.data || []).map(async (holding: any) => {
+          try {
+            const instrumentToken = holding.instrument_token;
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            // Skip weekends - find last trading day
+            while (yesterday.getDay() === 0 || yesterday.getDay() === 6) {
+              yesterday.setDate(yesterday.getDate() - 1);
+            }
+            
+            const fromDate = yesterday.toISOString().split('T')[0];
+            const toDate = fromDate;
+            
+            const histUrl = `https://api.kite.trade/instruments/historical/${instrumentToken}/day?from=${fromDate}&to=${toDate}`;
+            console.log(`Fetching historical data for ${holding.tradingsymbol}: ${histUrl}`);
+            
+            const histResponse = await fetch(histUrl, {
+              headers: {
+                'X-Kite-Version': '3',
+                'Authorization': `token ${KITE_API_KEY}:${accessToken}`,
+              },
+            });
+            
+            if (histResponse.ok) {
+              const histData = await histResponse.json();
+              // Historical data format: [timestamp, open, high, low, close, volume]
+              if (histData.data?.candles?.length > 0) {
+                const candle = histData.data.candles[0];
+                return { ...holding, prev_day_low: candle[3] };
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to fetch historical for ${holding.tradingsymbol}:`, err);
+          }
+          return { ...holding, prev_day_low: null };
+        })
+      );
+
+      return new Response(JSON.stringify({ holdings: holdingsWithPrevLow }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
