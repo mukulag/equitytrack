@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats, importKiteTrades } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats, importKiteHoldings } = useTrades();
   const { signOut, user } = useAuth();
   const stats = getStats();
 
@@ -38,7 +38,7 @@ const Index = () => {
 
   // Kite Connect integration state
   const [kiteToken, setKiteToken] = useState<string | null>(null);
-  const [kiteOrders, setKiteOrders] = useState<any[] | null>(null);
+  const [kiteHoldings, setKiteHoldings] = useState<any[] | null>(null);
   const [kiteError, setKiteError] = useState<string | null>(null);
   const [kiteLoading, setKiteLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -63,11 +63,11 @@ const Index = () => {
         .then(data => {
           if (data.access_token) {
             setKiteToken(data.access_token);
-            // Fetch orders
-            return fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=orders&access_token=${data.access_token}`)
+            // Fetch holdings (all portfolio positions)
+            return fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=holdings&access_token=${data.access_token}`)
               .then(res => res.json())
-              .then(orderData => setKiteOrders(orderData.orders || []))
-              .catch(() => setKiteError('Failed to fetch orders'));
+              .then(holdingsData => setKiteHoldings(holdingsData.holdings || []))
+              .catch(() => setKiteError('Failed to fetch holdings'));
           } else {
             setKiteError(data.error || 'Failed to get access token');
           }
@@ -89,11 +89,11 @@ const Index = () => {
     }
   };
 
-  const handleImportTrades = async () => {
-    if (!kiteOrders || kiteOrders.length === 0) return;
+  const handleImportHoldings = async () => {
+    if (!kiteHoldings || kiteHoldings.length === 0) return;
     setImporting(true);
     try {
-      await importKiteTrades(kiteOrders);
+      await importKiteHoldings(kiteHoldings);
     } finally {
       setImporting(false);
     }
@@ -141,10 +141,10 @@ const Index = () => {
           <Button onClick={handleKiteLogin} disabled={kiteLoading || !!kiteToken} variant="outline">
             {kiteLoading ? 'Connecting...' : kiteToken ? 'Connected to Kite' : 'Connect Kite Account'}
           </Button>
-          {kiteToken && kiteOrders && kiteOrders.length > 0 && (
-            <Button onClick={handleImportTrades} disabled={importing}>
+          {kiteToken && kiteHoldings && kiteHoldings.length > 0 && (
+            <Button onClick={handleImportHoldings} disabled={importing}>
               <Download className="h-4 w-4 mr-2" />
-              {importing ? 'Importing...' : `Import ${kiteOrders.filter(o => o.status === 'COMPLETE' && o.transaction_type === 'BUY').length} Trades`}
+              {importing ? 'Importing...' : `Import ${kiteHoldings.length} Holdings`}
             </Button>
           )}
           {kiteError && <span className="text-destructive text-sm">{kiteError}</span>}

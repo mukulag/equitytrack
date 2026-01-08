@@ -72,7 +72,7 @@ serve(async (req) => {
       });
     }
 
-    // Action: Fetch orders
+    // Action: Fetch today's orders
     if (action === 'orders') {
       const accessToken = url.searchParams.get('access_token');
       
@@ -104,6 +104,78 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ orders: data.data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Action: Fetch executed trades (for the day)
+    if (action === 'trades') {
+      const accessToken = url.searchParams.get('access_token');
+      
+      if (!accessToken) {
+        return new Response(JSON.stringify({ error: 'access_token is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('Fetching trades from Kite...');
+      
+      const response = await fetch('https://api.kite.trade/trades', {
+        headers: {
+          'X-Kite-Version': '3',
+          'Authorization': `token ${KITE_API_KEY}:${accessToken}`,
+        },
+      });
+
+      const data = await response.json();
+      console.log('Kite trades response status:', response.status);
+      
+      if (!response.ok) {
+        console.error('Kite trades error:', data);
+        return new Response(JSON.stringify({ error: data.message || 'Failed to fetch trades' }), {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ trades: data.data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Action: Fetch holdings (current portfolio positions)
+    if (action === 'holdings') {
+      const accessToken = url.searchParams.get('access_token');
+      
+      if (!accessToken) {
+        return new Response(JSON.stringify({ error: 'access_token is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('Fetching holdings from Kite...');
+      
+      const response = await fetch('https://api.kite.trade/portfolio/holdings', {
+        headers: {
+          'X-Kite-Version': '3',
+          'Authorization': `token ${KITE_API_KEY}:${accessToken}`,
+        },
+      });
+
+      const data = await response.json();
+      console.log('Kite holdings response status:', response.status);
+      
+      if (!response.ok) {
+        console.error('Kite holdings error:', data);
+        return new Response(JSON.stringify({ error: data.message || 'Failed to fetch holdings' }), {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ holdings: data.data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
