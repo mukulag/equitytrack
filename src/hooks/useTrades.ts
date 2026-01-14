@@ -506,6 +506,123 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     return { imported, skipped };
   };
 
+  const importKiteOrders = async (orders: any[]) => {
+    if (!user) return { imported: 0, skipped: 0 };
+
+    let imported = 0;
+    let skipped = 0;
+
+    // Group orders by symbol to calculate net position
+    for (const order of orders) {
+      // Only import completed orders
+      if (order.status !== 'COMPLETE') {
+        skipped++;
+        continue;
+      }
+
+      try {
+        // Check if trade already exists with same symbol, price and date
+        const orderDate = order.order_timestamp?.split(' ')[0] || new Date().toISOString().split('T')[0];
+        
+        const { data: existing } = await supabase
+          .from('trades')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('symbol', order.tradingsymbol)
+          .eq('entry_price', order.average_price)
+          .eq('entry_date', orderDate)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        const isBuy = order.transaction_type === 'BUY';
+
+        const { error } = await supabase.from('trades').insert({
+          user_id: user.id,
+          symbol: order.tradingsymbol,
+          trade_type: isBuy ? 'LONG' : 'SHORT',
+          entry_date: orderDate,
+          entry_price: order.average_price,
+          quantity: order.filled_quantity || order.quantity,
+          remaining_quantity: order.filled_quantity || order.quantity,
+          current_price: order.average_price,
+          notes: `Imported from Kite - Order ID: ${order.order_id}`,
+        });
+
+        if (error) throw error;
+        imported++;
+      } catch (error) {
+        console.error('Failed to import order:', order, error);
+        skipped++;
+      }
+    }
+
+    if (imported > 0) {
+      toast.success(`Imported ${imported} orders from Kite`);
+      fetchTrades();
+    }
+
+    return { imported, skipped };
+  };
+
+  const importCSVTrades = async (trades: Array<{
+    symbol: string;
+    tradeType: 'LONG' | 'SHORT';
+    entryDate: string;
+    entryPrice: number;
+    quantity: number;
+  }>) => {
+    if (!user) return { imported: 0, skipped: 0 };
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const trade of trades) {
+      try {
+        // Check for duplicate
+        const { data: existing } = await supabase
+          .from('trades')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('symbol', trade.symbol)
+          .eq('entry_price', trade.entryPrice)
+          .eq('entry_date', trade.entryDate)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        const { error } = await supabase.from('trades').insert({
+          user_id: user.id,
+          symbol: trade.symbol,
+          trade_type: trade.tradeType,
+          entry_date: trade.entryDate,
+          entry_price: trade.entryPrice,
+          quantity: trade.quantity,
+          remaining_quantity: trade.quantity,
+          notes: `Imported from CSV`,
+        });
+
+        if (error) throw error;
+        imported++;
+      } catch (error) {
+        console.error('Failed to import trade:', trade, error);
+        skipped++;
+      }
+    }
+
+    if (imported > 0) {
+      fetchTrades();
+    }
+
+    return { imported, skipped };
+  };
+
   return {
     trades,
     loading,
@@ -519,6 +636,8 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     editExit,
     getStats,
     importKiteHoldings,
+    importKiteOrders,
+    importCSVTrades,
     refetch: fetchTrades,
   };
 };

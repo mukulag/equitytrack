@@ -10,9 +10,10 @@ import { LivePriceIndicator } from '@/components/LivePriceIndicator';
 import { Footer } from '@/components/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { KiteImportDialog, ParsedCSVTrade } from '@/components/KiteImportDialog';
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats, importKiteHoldings } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
   const { signOut, user } = useAuth();
   const stats = getStats();
 
@@ -127,6 +128,19 @@ const Index = () => {
     await fetchAndSyncHoldings(kiteToken);
   };
 
+  const handleImportTodaysOrders = async () => {
+    if (!kiteToken) return;
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=orders&access_token=${kiteToken}`);
+    const data = await res.json();
+    if (data.orders) {
+      await importKiteOrders(data.orders);
+    }
+  };
+
+  const handleImportCSV = async (csvTrades: ParsedCSVTrade[]) => {
+    return await importCSVTrades(csvTrades);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -172,9 +186,14 @@ const Index = () => {
           {kiteToken && (
             <Button onClick={handleManualSync} disabled={syncing} variant="outline">
               <Download className="h-4 w-4 mr-2" />
-              {syncing ? 'Syncing...' : 'Sync Now'}
+              {syncing ? 'Syncing...' : 'Sync Holdings'}
             </Button>
           )}
+          <KiteImportDialog
+            kiteToken={kiteToken}
+            onImportTodaysOrders={handleImportTodaysOrders}
+            onImportCSV={handleImportCSV}
+          />
           {kiteToken && lastSync && (
             <span className="text-xs text-muted-foreground">
               Last sync: {lastSync.toLocaleTimeString()}
