@@ -38,14 +38,39 @@ const Index = () => {
 
   // Kite Connect integration state
   const [kiteToken, setKiteToken] = useState<string | null>(null);
-  const [kiteHoldings, setKiteHoldings] = useState<any[] | null>(null);
   const [kiteError, setKiteError] = useState<string | null>(null);
   const [kiteLoading, setKiteLoading] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+  const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
-  // Handle Kite login redirect
+  // Fetch and auto-import holdings
+  const fetchAndSyncHoldings = React.useCallback(async (accessToken: string, showToast = true) => {
+    setSyncing(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=holdings&access_token=${accessToken}`);
+      const holdingsData = await res.json();
+      
+      if (holdingsData.holdings && holdingsData.holdings.length > 0) {
+        const result = await importKiteHoldings(holdingsData.holdings);
+        setLastSync(new Date());
+        if (showToast && result.imported > 0) {
+          // Toast is already shown in importKiteHoldings
+        }
+      }
+    } catch (error) {
+      console.error('Failed to sync holdings:', error);
+      if (showToast) {
+        setKiteError('Failed to sync holdings');
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }, [SUPABASE_URL, importKiteHoldings]);
+
+  // Handle Kite login redirect - auto-import on successful login
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestToken = params.get('request_token');
@@ -60,14 +85,11 @@ const Index = () => {
         body: JSON.stringify({ request_token: requestToken })
       })
         .then(res => res.json())
-        .then(data => {
+        .then(async (data) => {
           if (data.access_token) {
             setKiteToken(data.access_token);
-            // Fetch holdings (all portfolio positions)
-            return fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=holdings&access_token=${data.access_token}`)
-              .then(res => res.json())
-              .then(holdingsData => setKiteHoldings(holdingsData.holdings || []))
-              .catch(() => setKiteError('Failed to fetch holdings'));
+            // Auto-import holdings immediately after login
+            await fetchAndSyncHoldings(data.access_token);
           } else {
             setKiteError(data.error || 'Failed to get access token');
           }
@@ -75,7 +97,18 @@ const Index = () => {
         .catch(() => setKiteError('Failed to get access token'))
         .finally(() => setKiteLoading(false));
     }
-  }, [kiteToken, SUPABASE_URL]);
+  }, [kiteToken, SUPABASE_URL, fetchAndSyncHoldings]);
+
+  // Periodic background sync every 5 minutes when connected
+  React.useEffect(() => {
+    if (!kiteToken) return;
+
+    const intervalId = setInterval(() => {
+      fetchAndSyncHoldings(kiteToken, false); // Silent sync (no toast)
+    }, SYNC_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [kiteToken, fetchAndSyncHoldings, SYNC_INTERVAL_MS]);
 
   const handleKiteLogin = async () => {
     try {
@@ -89,14 +122,9 @@ const Index = () => {
     }
   };
 
-  const handleImportHoldings = async () => {
-    if (!kiteHoldings || kiteHoldings.length === 0) return;
-    setImporting(true);
-    try {
-      await importKiteHoldings(kiteHoldings);
-    } finally {
-      setImporting(false);
-    }
+  const handleManualSync = async () => {
+    if (!kiteToken) return;
+    await fetchAndSyncHoldings(kiteToken);
   };
 
   return (
@@ -136,16 +164,21 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8 flex-1">
-        {/* Kite Connect Button and Import */}
+        {/* Kite Connect Button and Sync Status */}
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <Button onClick={handleKiteLogin} disabled={kiteLoading || !!kiteToken} variant="outline">
             {kiteLoading ? 'Connecting...' : kiteToken ? 'Connected to Kite' : 'Connect Kite Account'}
           </Button>
-          {kiteToken && kiteHoldings && kiteHoldings.length > 0 && (
-            <Button onClick={handleImportHoldings} disabled={importing}>
+          {kiteToken && (
+            <Button onClick={handleManualSync} disabled={syncing} variant="outline">
               <Download className="h-4 w-4 mr-2" />
-              {importing ? 'Importing...' : `Import ${kiteHoldings.length} Holdings`}
+              {syncing ? 'Syncing...' : 'Sync Now'}
             </Button>
+          )}
+          {kiteToken && lastSync && (
+            <span className="text-xs text-muted-foreground">
+              Last sync: {lastSync.toLocaleTimeString()}
+            </span>
           )}
           {kiteError && <span className="text-destructive text-sm">{kiteError}</span>}
         </div>
