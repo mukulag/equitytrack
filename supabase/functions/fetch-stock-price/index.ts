@@ -64,15 +64,19 @@ async function fetchYahooPrice(symbol: string): Promise<StockQuote> {
     const open = opens[lastIdx];
     const high = highs[lastIdx];
     const low = lows[lastIdx];
-    
+    // Also return the full intraday arrays for fallback
     console.log(`Got price for ${symbol}: ${price}, Open: ${open}, High: ${high}, Low: ${low}`);
-    return { 
-      symbol, 
+    return {
+      symbol,
       price: Number(price),
       open: open !== null && open !== undefined ? Number(open) : null,
       high: high !== null && high !== undefined ? Number(high) : null,
       low: low !== null && low !== undefined ? Number(low) : null,
-      close: Number(price)
+      close: Number(price),
+      lows: lows,
+      highs: highs,
+      opens: opens,
+      closes: closes
     };
   } catch (error) {
     console.error(`Error fetching ${symbol}:`, error);
