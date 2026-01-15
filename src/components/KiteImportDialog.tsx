@@ -13,15 +13,19 @@ interface KiteImportDialogProps {
   disabled?: boolean;
 }
 
+export interface ParsedCSVExit {
+  exitDate: string;
+  exitPrice: number;
+  quantity: number;
+}
+
 export interface ParsedCSVTrade {
   symbol: string;
   tradeType: 'LONG' | 'SHORT';
   entryDate: string;
   entryPrice: number;
   quantity: number;
-  exitDate?: string;
-  exitPrice?: number;
-  exitQuantity?: number;
+  exits?: ParsedCSVExit[];
 }
 
 export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV, disabled }: KiteImportDialogProps) {
@@ -51,88 +55,112 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
     const lines = csvText.trim().split('\n');
     if (lines.length < 2) return [];
 
-    const header = lines[0].toLowerCase();
-    const isKiteFormat = header.includes('trade_date') || header.includes('symbol') || header.includes('trade_type');
+    // Parse header
+    const headers = lines[0].split(',').map(h => h.toLowerCase().trim().replace(/"/g, ''));
     
-    const trades: ParsedCSVTrade[] = [];
+    const getCol = (names: string[]): number => {
+      for (const name of names) {
+        const idx = headers.findIndex(h => h.includes(name));
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    // Detect column indices
+    const dateIdx = getCol(['trade_date', 'date', 'order_date']);
+    const symbolIdx = getCol(['symbol', 'tradingsymbol', 'scrip']);
+    const typeIdx = getCol(['trade_type', 'type', 'buy_sell', 'side']);
+    const qtyIdx = getCol(['quantity', 'qty', 'traded_qty']);
+    const priceIdx = getCol(['price', 'trade_price', 'avg_price', 'average_price']);
     
-    // Skip header
+    // Map trades by (symbol, entryDate, entryPrice) to link entries and exits
+    const tradeMap = new Map<string, ParsedCSVTrade>();
+    
+    // Parse each row
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
-      // Parse CSV line (handle quoted values)
-      const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/"/g, '').trim()) || [];
-      
-      if (values.length < 5) continue;
-
       try {
-        // Expected Kite Console format columns:
-        // trade_date, exchange, segment, symbol, trade_type, quantity, price, order_id, trade_id
-        // Or similar variations
+        // Parse CSV line (handle quoted values)
+        const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/"/g, '').trim()) || [];
         
-        // Try to detect columns by header
-        const headers = lines[0].split(',').map(h => h.toLowerCase().trim().replace(/"/g, ''));
-        
-        const getCol = (names: string[]): number => {
-          for (const name of names) {
-            const idx = headers.findIndex(h => h.includes(name));
-            if (idx !== -1) return idx;
-          }
-          return -1;
-        };
+        if (values.length < 5) continue;
 
-        const dateIdx = getCol(['trade_date', 'date', 'order_date']);
-        const symbolIdx = getCol(['symbol', 'tradingsymbol', 'scrip']);
-        const typeIdx = getCol(['trade_type', 'type', 'buy_sell', 'side']);
-        const qtyIdx = getCol(['quantity', 'qty', 'traded_qty']);
-        const priceIdx = getCol(['price', 'trade_price', 'avg_price', 'average_price']);
+        let date, symbol, type, qty, price;
 
         if (dateIdx === -1 || symbolIdx === -1 || qtyIdx === -1 || priceIdx === -1) {
           // Fallback: assume standard order
-          const [date, , , symbol, type, qty, price] = values;
-          
-          const parsedDate = new Date(date);
-          if (isNaN(parsedDate.getTime())) continue;
-
-          const isBuy = type?.toUpperCase() === 'BUY' || type?.toUpperCase() === 'B';
-          
-          trades.push({
-            symbol: symbol,
-            tradeType: isBuy ? 'LONG' : 'SHORT',
-            entryDate: parsedDate.toISOString().split('T')[0],
-            entryPrice: parseFloat(price),
-            quantity: Math.abs(parseInt(qty)),
-          });
+          [date, , , symbol, type, qty, price] = values;
         } else {
-          const date = values[dateIdx];
-          const symbol = values[symbolIdx];
-          const type = values[typeIdx];
-          const qty = values[qtyIdx];
-          const price = values[priceIdx];
+          date = values[dateIdx];
+          symbol = values[symbolIdx];
+          type = values[typeIdx];
+          qty = values[qtyIdx];
+          price = values[priceIdx];
+        }
 
-          const parsedDate = new Date(date);
-          if (isNaN(parsedDate.getTime())) continue;
-          
-          // Filter by fromDate
-          if (parsedDate < new Date(fromDate)) continue;
+        const parsedDate = new Date(date);
+        if (isNaN(parsedDate.getTime())) continue;
+        
+        // Filter by fromDate
+        if (parsedDate < new Date(fromDate)) continue;
 
-          const isBuy = type?.toUpperCase() === 'BUY' || type?.toUpperCase() === 'B';
+        const isBuy = type?.toUpperCase() === 'BUY' || type?.toUpperCase() === 'B';
+        const cleanSymbol = symbol.replace('-EQ', '').replace('-BE', '');
+        const quantity = Math.abs(parseInt(qty));
+        const priceNum = parseFloat(price);
+        const dateStr = parsedDate.toISOString().split('T')[0];
+        
+        // Create a key to group entry and exit
+        // If isBuy (entry), store it; if !isBuy (exit), find and add to corresponding entry
+        if (isBuy) {
+          // This is an entry
+          const key = `${cleanSymbol}_${dateStr}_${priceNum}`;
+          if (!tradeMap.has(key)) {
+            tradeMap.set(key, {
+              symbol: cleanSymbol,
+              tradeType: 'LONG',
+              entryDate: dateStr,
+              entryPrice: priceNum,
+              quantity: quantity,
+              exits: [],
+            });
+          } else {
+            // Merge quantities if same entry
+            const existing = tradeMap.get(key)!;
+            existing.quantity += quantity;
+          }
+        } else {
+          // This is an exit - try to find the most recent entry for this symbol
+          const entriesForSymbol = Array.from(tradeMap.entries())
+            .filter(([key]) => key.startsWith(cleanSymbol + '_'))
+            .sort(([keyA], [keyB]) => keyB[0].localeCompare(keyA[0])); // Sort by date desc
           
-          trades.push({
-            symbol: symbol.replace('-EQ', '').replace('-BE', ''),
-            tradeType: isBuy ? 'LONG' : 'SHORT',
-            entryDate: parsedDate.toISOString().split('T')[0],
-            entryPrice: parseFloat(price),
-            quantity: Math.abs(parseInt(qty)),
-          });
+          if (entriesForSymbol.length > 0) {
+            const [, trade] = entriesForSymbol[0];
+            if (!trade.exits) trade.exits = [];
+            
+            // Check if this quantity is already accounted for
+            const existingExitQty = (trade.exits || []).reduce((sum, e) => sum + e.quantity, 0);
+            const remainingQty = trade.quantity - existingExitQty;
+            
+            if (remainingQty > 0) {
+              const exitQty = Math.min(quantity, remainingQty);
+              (trade.exits || []).push({
+                exitDate: dateStr,
+                exitPrice: priceNum,
+                quantity: exitQty,
+              });
+            }
+          }
         }
       } catch (e) {
         console.warn('Failed to parse CSV line:', line, e);
       }
     }
 
-    return trades;
+    return Array.from(tradeMap.values());
   };
 
   const handleCSVImport = async () => {

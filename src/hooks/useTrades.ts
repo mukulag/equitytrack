@@ -574,6 +574,11 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     entryDate: string;
     entryPrice: number;
     quantity: number;
+    exits?: Array<{
+      exitDate: string;
+      exitPrice: number;
+      quantity: number;
+    }>;
   }>) => {
     if (!user) return { imported: 0, skipped: 0 };
 
@@ -597,18 +602,71 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           continue;
         }
 
-        const { error } = await supabase.from('trades').insert({
+        // Calculate total exit quantity
+        const totalExitQty = (trade.exits || []).reduce((sum, exit) => sum + exit.quantity, 0);
+        const remainingQty = trade.quantity - totalExitQty;
+        
+        // Calculate booked profit and status
+        let bookedProfit = 0;
+        let totalPnl = 0;
+        let status: 'OPEN' | 'PARTIAL' | 'CLOSED' = 'OPEN';
+        
+        if ((trade.exits || []).length > 0) {
+          for (const exit of trade.exits!) {
+            const pnl = (exit.exitPrice - trade.entryPrice) * exit.quantity;
+            bookedProfit += pnl;
+            totalPnl += pnl;
+          }
+          
+          if (remainingQty === 0) {
+            status = 'CLOSED';
+          } else if (remainingQty < trade.quantity) {
+            status = 'PARTIAL';
+          }
+        }
+
+        const { data: insertedTrade, error: insertError } = await supabase.from('trades').insert({
           user_id: user.id,
           symbol: trade.symbol,
           trade_type: trade.tradeType,
           entry_date: trade.entryDate,
           entry_price: trade.entryPrice,
           quantity: trade.quantity,
-          remaining_quantity: trade.quantity,
+          remaining_quantity: remainingQty,
+          booked_profit: bookedProfit,
+          total_pnl: totalPnl,
+          status: status,
           notes: `Imported from CSV`,
-        });
+        }).select('id');
 
-        if (error) throw error;
+        if (insertError) throw insertError;
+        if (!insertedTrade || insertedTrade.length === 0) throw new Error('Failed to insert trade');
+
+        const tradeId = insertedTrade[0].id;
+
+        // Insert exits if any
+        if ((trade.exits || []).length > 0) {
+          const exitsToInsert = (trade.exits || []).map(exit => {
+            const exitPnl = (exit.exitPrice - trade.entryPrice) * exit.quantity;
+            return {
+              trade_id: tradeId,
+              exit_date: exit.exitDate,
+              exit_price: exit.exitPrice,
+              quantity: exit.quantity,
+              pnl: exitPnl,
+            };
+          });
+
+          const { error: exitsError } = await supabase
+            .from('exits')
+            .insert(exitsToInsert);
+
+          if (exitsError) {
+            console.error('Failed to insert exits:', exitsError);
+            // Don't fail the whole import, just skip the exits
+          }
+        }
+
         imported++;
       } catch (error) {
         console.error('Failed to import trade:', trade, error);
