@@ -86,15 +86,17 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
           console.error('Error fetching CMP:', error);
           setCmp(null);
           setDailyLow(null);
-        } else if (data?.quotes && data.quotes[0]) {
+        } else if (data?.quotes && Array.isArray(data.quotes) && data.quotes.length > 0) {
           const quote = data.quotes[0];
+          console.log('Fetched quote:', quote);
           setCmp(quote.price);
           setDailyLow(quote.low);
-          // Auto-populate Setup SL with daily low
-          if (quote.low && !setupStopLoss) {
+          // Auto-populate Setup SL with daily low - always set it when we fetch
+          if (quote.low) {
             setSetupStopLoss(quote.low.toFixed(2));
           }
         } else {
+          console.warn('No valid quote data received:', data);
           setCmp(null);
           setDailyLow(null);
         }
@@ -112,7 +114,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [symbol, setupStopLoss]);
+  }, [symbol]);
 
   // Reset CMP when dialog closes
   useEffect(() => {
@@ -247,8 +249,11 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 onChange={(e) => setSetupStopLoss(e.target.value)}
                 className="bg-secondary/50 border-border font-mono"
               />
-              {dailyLow && !setupStopLoss && (
-                <p className="text-xs text-muted-foreground">
+              {isFetchingCmp && (
+                <p className="text-xs text-muted-foreground">Fetching daily low...</p>
+              )}
+              {dailyLow && (
+                <p className="text-xs text-primary font-semibold">
                   Daily Low: ₹{dailyLow.toFixed(2)}
                 </p>
               )}

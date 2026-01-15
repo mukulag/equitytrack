@@ -584,24 +584,33 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
 
     let imported = 0;
     let skipped = 0;
-
     // Fetch daily lows for all unique symbols
     const uniqueSymbols = [...new Set(trades.map(t => t.symbol))];
     const dailyLowsMap = new Map<string, number | null>();
+
+    console.log('Fetching daily lows for symbols:', uniqueSymbols);
 
     try {
       const { data: dailyData, error: dailyError } = await supabase.functions.invoke('fetch-stock-price', {
         body: { symbols: uniqueSymbols },
       });
 
-      if (!dailyError && dailyData?.quotes) {
+      if (dailyError) {
+        console.error('Error fetching daily lows:', dailyError);
+      } else if (dailyData?.quotes && Array.isArray(dailyData.quotes)) {
+        console.log('Received quotes:', dailyData.quotes);
         dailyData.quotes.forEach((quote: any) => {
+          console.log(`Setting daily low for ${quote.symbol}: ${quote.low}`);
           dailyLowsMap.set(quote.symbol, quote.low || null);
         });
+      } else {
+        console.warn('No valid quotes data received:', dailyData);
       }
     } catch (error) {
       console.error('Failed to fetch daily lows:', error);
     }
+
+    console.log('Daily lows map:', Array.from(dailyLowsMap.entries()));
 
     for (const trade of trades) {
       try {
@@ -645,6 +654,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
 
         // Get daily low for this symbol
         const setupSL = dailyLowsMap.get(trade.symbol) || null;
+        console.log(`Inserting trade ${trade.symbol} with setup SL: ${setupSL}`);
 
         const { data: insertedTrade, error: insertError } = await supabase.from('trades').insert({
           user_id: user.id,

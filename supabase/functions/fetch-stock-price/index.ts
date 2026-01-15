@@ -69,9 +69,9 @@ async function fetchYahooPrice(symbol: string): Promise<StockQuote> {
     return { 
       symbol, 
       price: Number(price),
-      open: open ? Number(open) : null,
-      high: high ? Number(high) : null,
-      low: low ? Number(low) : null,
+      open: open !== null && open !== undefined ? Number(open) : null,
+      high: high !== null && high !== undefined ? Number(high) : null,
+      low: low !== null && low !== undefined ? Number(low) : null,
       close: Number(price)
     };
   } catch (error) {
