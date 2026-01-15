@@ -585,6 +585,24 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     let imported = 0;
     let skipped = 0;
 
+    // Fetch daily lows for all unique symbols
+    const uniqueSymbols = [...new Set(trades.map(t => t.symbol))];
+    const dailyLowsMap = new Map<string, number | null>();
+
+    try {
+      const { data: dailyData, error: dailyError } = await supabase.functions.invoke('fetch-stock-price', {
+        body: { symbols: uniqueSymbols },
+      });
+
+      if (!dailyError && dailyData?.quotes) {
+        dailyData.quotes.forEach((quote: any) => {
+          dailyLowsMap.set(quote.symbol, quote.low || null);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch daily lows:', error);
+    }
+
     for (const trade of trades) {
       try {
         // Check for duplicate
@@ -625,6 +643,9 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           }
         }
 
+        // Get daily low for this symbol
+        const setupSL = dailyLowsMap.get(trade.symbol) || null;
+
         const { data: insertedTrade, error: insertError } = await supabase.from('trades').insert({
           user_id: user.id,
           symbol: trade.symbol,
@@ -636,6 +657,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           booked_profit: bookedProfit,
           total_pnl: totalPnl,
           status: status,
+          setup_stop_loss: setupSL,
           notes: `Imported from CSV`,
         }).select('id');
 

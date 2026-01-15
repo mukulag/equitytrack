@@ -8,6 +8,10 @@ const corsHeaders = {
 interface StockQuote {
   symbol: string;
   price: number | null;
+  low?: number | null;
+  high?: number | null;
+  open?: number | null;
+  close?: number | null;
   error?: string;
 }
 
@@ -16,7 +20,7 @@ async function fetchYahooPrice(symbol: string): Promise<StockQuote> {
     // Add .NS suffix for NSE stocks if not already present
     const yahooSymbol = symbol.includes('.') ? symbol : `${symbol}.NS`;
     
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1m&range=1d`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=5d`;
     
     console.log(`Fetching price for ${yahooSymbol} from Yahoo Finance`);
     
@@ -39,18 +43,37 @@ async function fetchYahooPrice(symbol: string): Promise<StockQuote> {
       return { symbol, price: null, error: 'Symbol not found' };
     }
 
-    // Get the most recent price
-    const regularMarketPrice = quote.meta?.regularMarketPrice;
-    const closePrice = quote.indicators?.quote?.[0]?.close?.filter((p: number | null) => p !== null).pop();
+    // Get the most recent candle data
+    const timestamps = quote.timestamp || [];
+    const opens = quote.indicators?.quote?.[0]?.open || [];
+    const highs = quote.indicators?.quote?.[0]?.high || [];
+    const lows = quote.indicators?.quote?.[0]?.low || [];
+    const closes = quote.indicators?.quote?.[0]?.close || [];
     
-    const price = regularMarketPrice || closePrice;
-    
-    if (price === undefined || price === null) {
-      return { symbol, price: null, error: 'Price not available' };
+    // Get the most recent valid data point
+    let lastIdx = timestamps.length - 1;
+    while (lastIdx >= 0 && (closes[lastIdx] === null || closes[lastIdx] === undefined)) {
+      lastIdx--;
     }
 
-    console.log(`Got price for ${symbol}: ${price}`);
-    return { symbol, price: Number(price) };
+    if (lastIdx < 0) {
+      return { symbol, price: null, error: 'No valid price data' };
+    }
+
+    const price = closes[lastIdx];
+    const open = opens[lastIdx];
+    const high = highs[lastIdx];
+    const low = lows[lastIdx];
+    
+    console.log(`Got price for ${symbol}: ${price}, Open: ${open}, High: ${high}, Low: ${low}`);
+    return { 
+      symbol, 
+      price: Number(price),
+      open: open ? Number(open) : null,
+      high: high ? Number(high) : null,
+      low: low ? Number(low) : null,
+      close: Number(price)
+    };
   } catch (error) {
     console.error(`Error fetching ${symbol}:`, error);
     return { symbol, price: null, error: String(error) };
