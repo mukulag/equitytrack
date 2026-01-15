@@ -203,7 +203,10 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </span>
         </td>
         <td className="p-4">
-          <Badge variant="outline" className={cn('text-xs', trade.tradeType === 'LONG' ? 'border-success/50 text-success' : 'border-destructive/50 text-destructive')}>
+          <Badge variant="outline" className={cn('text-xs', 
+            trade.tradeType === 'LONG' ? 'border-success/50 text-success' : 
+            trade.tradeType === 'SHORT' ? 'border-destructive/50 text-destructive' : 
+            'border-primary/50 text-primary')}>
             {trade.tradeType}
           </Badge>
         </td>

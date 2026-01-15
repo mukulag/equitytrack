@@ -1,4 +1,4 @@
-export type TradeType = 'LONG' | 'SHORT';
+export type TradeType = 'LONG' | 'SHORT' | 'IPO';
 export type TradeStatus = 'OPEN' | 'PARTIAL' | 'CLOSED';
 
 export interface Exit {

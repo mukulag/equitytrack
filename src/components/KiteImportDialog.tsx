@@ -21,11 +21,12 @@ export interface ParsedCSVExit {
 
 export interface ParsedCSVTrade {
   symbol: string;
-  tradeType: 'LONG' | 'SHORT';
+  tradeType: 'LONG' | 'SHORT' | 'IPO';
   entryDate: string;
   entryPrice: number;
   quantity: number;
   exits?: ParsedCSVExit[];
+  notes?: string;
 }
 
 export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV, disabled }: KiteImportDialogProps) {
@@ -136,15 +137,13 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
           const entriesForSymbol = Array.from(tradeMap.entries())
             .filter(([key]) => key.startsWith(cleanSymbol + '_'))
             .sort(([keyA], [keyB]) => keyB[0].localeCompare(keyA[0])); // Sort by date desc
-          
+
           if (entriesForSymbol.length > 0) {
             const [, trade] = entriesForSymbol[0];
             if (!trade.exits) trade.exits = [];
-            
             // Check if this quantity is already accounted for
             const existingExitQty = (trade.exits || []).reduce((sum, e) => sum + e.quantity, 0);
             const remainingQty = trade.quantity - existingExitQty;
-            
             if (remainingQty > 0) {
               const exitQty = Math.min(quantity, remainingQty);
               (trade.exits || []).push({
@@ -152,6 +151,24 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
                 exitPrice: priceNum,
                 quantity: exitQty,
               });
+            }
+          } else {
+            // No entry found: treat as IPO/Sell-only entry
+            // Store for later processing to fetch IPO listing data
+            const key = `SELLONLY_${cleanSymbol}_${dateStr}_${priceNum}`;
+            if (!tradeMap.has(key)) {
+              tradeMap.set(key, {
+                symbol: cleanSymbol,
+                tradeType: 'IPO',
+                entryDate: dateStr,
+                entryPrice: priceNum,
+                quantity: quantity,
+                exits: [],
+                notes: 'IPO allotment - entry date/price to be fetched',
+              });
+            } else {
+              const existing = tradeMap.get(key)!;
+              existing.quantity += quantity;
             }
           }
         }

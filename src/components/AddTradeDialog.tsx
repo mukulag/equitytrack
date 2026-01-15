@@ -210,6 +210,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 <SelectContent>
                   <SelectItem value="LONG">Long</SelectItem>
                   <SelectItem value="SHORT">Short</SelectItem>
+                  <SelectItem value="IPO">IPO</SelectItem>
                 </SelectContent>
               </Select>
             </div>

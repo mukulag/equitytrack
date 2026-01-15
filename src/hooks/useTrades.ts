@@ -638,14 +638,49 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
 
     for (const trade of trades) {
       try {
+        let finalTrade = trade;
+        
+        // For IPO trades, fetch the listing date and allotment price from Chittorgarh
+        if (trade.tradeType === 'IPO') {
+          console.log(`Fetching IPO listing data for ${trade.symbol}...`);
+          try {
+            const currentYear = new Date().getFullYear();
+            const { data: ipoData, error: ipoError } = await supabase.functions.invoke('fetch-ipo-data', {
+              body: { symbols: [trade.symbol], year: currentYear },
+            });
+
+            if (!ipoError && ipoData?.ipos && Array.isArray(ipoData.ipos) && ipoData.ipos.length > 0) {
+              const ipoInfo = ipoData.ipos[0];
+              
+              if (ipoInfo.listingDate && ipoInfo.allotmentPrice) {
+                console.log(`IPO ${trade.symbol}: Listing date=${ipoInfo.listingDate}, Allotment price=${ipoInfo.allotmentPrice}`);
+                
+                // Update the trade with IPO listing date and allotment price
+                finalTrade = {
+                  ...trade,
+                  entryDate: ipoInfo.listingDate,
+                  entryPrice: ipoInfo.allotmentPrice,
+                };
+              } else {
+                console.warn(`Incomplete IPO data for ${trade.symbol}:`, ipoInfo);
+              }
+            } else {
+              console.warn(`No IPO data found for ${trade.symbol}`, ipoData);
+            }
+          } catch (ipoFetchError) {
+            console.warn(`Failed to fetch IPO data for ${trade.symbol}:`, ipoFetchError);
+            // Continue with the original data if fetch fails
+          }
+        }
+
         // Check for duplicate
         const { data: existing } = await supabase
           .from('trades')
           .select('id')
           .eq('user_id', user.id)
-          .eq('symbol', trade.symbol)
-          .eq('entry_price', trade.entryPrice)
-          .eq('entry_date', trade.entryDate)
+          .eq('symbol', finalTrade.symbol)
+          .eq('entry_price', finalTrade.entryPrice)
+          .eq('entry_date', finalTrade.entryDate)
           .limit(1);
 
         if (existing && existing.length > 0) {
@@ -654,47 +689,47 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
         }
 
         // Calculate total exit quantity
-        const totalExitQty = (trade.exits || []).reduce((sum, exit) => sum + exit.quantity, 0);
-        const remainingQty = trade.quantity - totalExitQty;
+        const totalExitQty = (finalTrade.exits || []).reduce((sum, exit) => sum + exit.quantity, 0);
+        const remainingQty = finalTrade.quantity - totalExitQty;
         
         // Calculate booked profit and status
         let bookedProfit = 0;
         let totalPnl = 0;
         let status: 'OPEN' | 'PARTIAL' | 'CLOSED' = 'OPEN';
         
-        if ((trade.exits || []).length > 0) {
-          for (const exit of trade.exits!) {
-            const pnl = (exit.exitPrice - trade.entryPrice) * exit.quantity;
+        if ((finalTrade.exits || []).length > 0) {
+          for (const exit of finalTrade.exits!) {
+            const pnl = (exit.exitPrice - finalTrade.entryPrice) * exit.quantity;
             bookedProfit += pnl;
             totalPnl += pnl;
           }
           
           if (remainingQty === 0) {
             status = 'CLOSED';
-          } else if (remainingQty < trade.quantity) {
+          } else if (remainingQty < finalTrade.quantity) {
             status = 'PARTIAL';
           }
         }
 
         // Get daily low for this symbol on the entry date
-        const lowKey = `${trade.symbol}_${trade.entryDate}`;
+        const lowKey = `${finalTrade.symbol}_${finalTrade.entryDate}`;
         let setupSL = dailyLowsMap.get(lowKey);
         if (setupSL === undefined) setupSL = null;
-        console.log(`Inserting trade ${trade.symbol} (${trade.entryDate}) with setup SL:`, setupSL);
+        console.log(`Inserting trade ${finalTrade.symbol} (${finalTrade.entryDate}) with setup SL:`, setupSL);
 
         const { data: insertedTrade, error: insertError } = await supabase.from('trades').insert({
           user_id: user.id,
-          symbol: trade.symbol,
-          trade_type: trade.tradeType,
-          entry_date: trade.entryDate,
-          entry_price: trade.entryPrice,
-          quantity: trade.quantity,
+          symbol: finalTrade.symbol,
+          trade_type: finalTrade.tradeType,
+          entry_date: finalTrade.entryDate,
+          entry_price: finalTrade.entryPrice,
+          quantity: finalTrade.quantity,
           remaining_quantity: remainingQty,
           booked_profit: bookedProfit,
           total_pnl: totalPnl,
           status: status,
           setup_stop_loss: setupSL,
-          notes: `Imported from CSV`,
+          notes: finalTrade.notes || 'Imported from CSV',
         }).select('id');
 
         if (insertError) throw insertError;
