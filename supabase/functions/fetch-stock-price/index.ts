@@ -13,14 +13,35 @@ interface StockQuote {
   open?: number | null;
   close?: number | null;
   error?: string;
+  lows?: (number | null)[];
+  highs?: (number | null)[];
+  opens?: (number | null)[];
+  closes?: (number | null)[];
 }
 
-async function fetchYahooPrice(symbol: string): Promise<StockQuote> {
+async function fetchYahooPrice(symbol: string, targetDate?: string): Promise<StockQuote> {
   try {
     // Add .NS suffix for NSE stocks if not already present
     const yahooSymbol = symbol.includes('.') ? symbol : `${symbol}.NS`;
     
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=5d`;
+    // If targetDate is provided, fetch historical data; otherwise fetch recent 5 days
+    let url: string;
+    if (targetDate) {
+      // Convert date to Unix timestamps for Yahoo Finance
+      const targetDateObj = new Date(targetDate);
+      const startOfDay = new Date(targetDateObj);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDateObj);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      // Add buffer days before and after to ensure we get the data
+      const period1 = Math.floor(startOfDay.getTime() / 1000) - 86400; // 1 day before
+      const period2 = Math.floor(endOfDay.getTime() / 1000) + 86400; // 1 day after
+      
+      url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&period1=${period1}&period2=${period2}`;
+    } else {
+      url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=5d`;
+    }
     
     console.log(`Fetching price for ${yahooSymbol} from Yahoo Finance`);
     
@@ -43,29 +64,42 @@ async function fetchYahooPrice(symbol: string): Promise<StockQuote> {
       return { symbol, price: null, error: 'Symbol not found' };
     }
 
-    // Get the most recent candle data
+    // Get the candle data
     const timestamps = quote.timestamp || [];
     const opens = quote.indicators?.quote?.[0]?.open || [];
     const highs = quote.indicators?.quote?.[0]?.high || [];
     const lows = quote.indicators?.quote?.[0]?.low || [];
     const closes = quote.indicators?.quote?.[0]?.close || [];
     
-    // Get the most recent valid data point
-    let lastIdx = timestamps.length - 1;
-    while (lastIdx >= 0 && (closes[lastIdx] === null || closes[lastIdx] === undefined)) {
-      lastIdx--;
+    // If targetDate is provided, find the candle for that specific date
+    let idx = timestamps.length - 1;
+    if (targetDate) {
+      const targetDateStr = targetDate.split('T')[0];
+      idx = timestamps.findIndex((ts: number) => {
+        const date = new Date(ts * 1000).toISOString().split('T')[0];
+        return date === targetDateStr;
+      });
+      if (idx === -1) {
+        // If exact date not found, use the closest available
+        idx = timestamps.length - 1;
+      }
+    } else {
+      // Get the most recent valid data point
+      while (idx >= 0 && (closes[idx] === null || closes[idx] === undefined)) {
+        idx--;
+      }
     }
 
-    if (lastIdx < 0) {
+    if (idx < 0) {
       return { symbol, price: null, error: 'No valid price data' };
     }
 
-    const price = closes[lastIdx];
-    const open = opens[lastIdx];
-    const high = highs[lastIdx];
-    const low = lows[lastIdx];
-    // Also return the full intraday arrays for fallback
-    console.log(`Got price for ${symbol}: ${price}, Open: ${open}, High: ${high}, Low: ${low}`);
+    const price = closes[idx];
+    const open = opens[idx];
+    const high = highs[idx];
+    const low = lows[idx];
+    
+    console.log(`Got price for ${symbol}${targetDate ? ` on ${targetDate}` : ''}: ${price}, Open: ${open}, High: ${high}, Low: ${low}`);
     return {
       symbol,
       price: Number(price),
@@ -91,7 +125,7 @@ serve(async (req) => {
   }
 
   try {
-    const { symbols } = await req.json();
+    const { symbols, date } = await req.json();
     
     if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
       return new Response(
@@ -100,10 +134,10 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Fetching prices for ${symbols.length} symbols:`, symbols);
+    console.log(`Fetching prices for ${symbols.length} symbols${date ? ` for date ${date}` : ''}:`, symbols);
 
-    // Fetch all prices in parallel
-    const quotes = await Promise.all(symbols.map(fetchYahooPrice));
+    // Fetch all prices in parallel, optionally for a specific date
+    const quotes = await Promise.all(symbols.map((s: string) => fetchYahooPrice(s, date)));
     
     // Convert to a map for easy lookup
     const priceMap: Record<string, number | null> = {};
