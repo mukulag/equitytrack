@@ -600,8 +600,17 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
       } else if (dailyData?.quotes && Array.isArray(dailyData.quotes)) {
         console.log('Received quotes:', dailyData.quotes);
         dailyData.quotes.forEach((quote: any) => {
-          console.log(`Setting daily low for ${quote.symbol}: ${quote.low}`);
-          dailyLowsMap.set(quote.symbol, quote.low || null);
+          let low = quote.low;
+          if (low === null || low === undefined) {
+            if (quote.lows && Array.isArray(quote.lows) && quote.lows.length > 0) {
+              const filteredLows = quote.lows.filter((v: number) => v !== null && v !== undefined);
+              if (filteredLows.length > 0) {
+                low = Math.min(...filteredLows);
+              }
+            }
+          }
+          console.log(`Setting daily low for ${quote.symbol}:`, low);
+          dailyLowsMap.set(quote.symbol, low !== undefined ? low : null);
         });
       } else {
         console.warn('No valid quotes data received:', dailyData);
@@ -653,8 +662,9 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
         }
 
         // Get daily low for this symbol
-        const setupSL = dailyLowsMap.get(trade.symbol) || null;
-        console.log(`Inserting trade ${trade.symbol} with setup SL: ${setupSL}`);
+        let setupSL = dailyLowsMap.get(trade.symbol);
+        if (setupSL === undefined) setupSL = null;
+        console.log(`Inserting trade ${trade.symbol} with setup SL:`, setupSL);
 
         const { data: insertedTrade, error: insertError } = await supabase.from('trades').insert({
           user_id: user.id,

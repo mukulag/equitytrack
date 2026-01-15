@@ -45,6 +45,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
   const [entryPrice, setEntryPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [setupStopLoss, setSetupStopLoss] = useState('');
+  const [setupSLWasSet, setSetupSLWasSet] = useState(false);
   const [currentStopLoss, setCurrentStopLoss] = useState('');
   const [targetRPT, setTargetRPT] = useState('2000');
   const [notes, setNotes] = useState('');
@@ -55,60 +56,64 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
 
   // Fetch CMP and daily low as user types in symbol field
   useEffect(() => {
-    // Clear previous timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-
-    // Reset CMP if symbol is empty
     if (!symbol.trim()) {
       setCmp(null);
       setDailyLow(null);
+      setSetupSLWasSet(false);
       return;
     }
-
-    // Debounce the API call
     debounceTimerRef.current = setTimeout(async () => {
       const symbolToFetch = symbol.trim().toUpperCase();
       if (!symbolToFetch) {
         setCmp(null);
         setDailyLow(null);
+        setSetupSLWasSet(false);
         return;
       }
-
       setIsFetchingCmp(true);
       try {
         const { data, error } = await supabase.functions.invoke('fetch-stock-price', {
           body: { symbols: [symbolToFetch] },
         });
-
         if (error) {
-          console.error('Error fetching CMP:', error);
           setCmp(null);
           setDailyLow(null);
+          setSetupSLWasSet(false);
         } else if (data?.quotes && Array.isArray(data.quotes) && data.quotes.length > 0) {
           const quote = data.quotes[0];
-          console.log('Fetched quote:', quote);
           setCmp(quote.price);
-          setDailyLow(quote.low);
-          // Auto-populate Setup SL with daily low - always set it when we fetch
-          if (quote.low) {
-            setSetupStopLoss(quote.low.toFixed(2));
+          let low = quote.low;
+          // Fallback: try to get lowest value from intraday prices if low is null/undefined
+          if (low === null || low === undefined) {
+            // Try to get from intraday array if present
+            if (quote.lows && Array.isArray(quote.lows) && quote.lows.length > 0) {
+              const filteredLows = quote.lows.filter(v => v !== null && v !== undefined);
+              if (filteredLows.length > 0) {
+                low = Math.min(...filteredLows);
+              }
+            }
+          }
+          setDailyLow(low);
+          if (!setupSLWasSet && low !== undefined && low !== null) {
+            setSetupStopLoss(Number(low).toFixed(2));
+            setSetupSLWasSet(true);
           }
         } else {
-          console.warn('No valid quote data received:', data);
           setCmp(null);
           setDailyLow(null);
+          setSetupSLWasSet(false);
         }
       } catch (err) {
-        console.error('Error fetching CMP:', err);
         setCmp(null);
         setDailyLow(null);
+        setSetupSLWasSet(false);
       } finally {
         setIsFetchingCmp(false);
       }
-    }, 500); // 500ms debounce
-
+    }, 500);
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -246,15 +251,18 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 step="0.01"
                 placeholder="Daily Low"
                 value={setupStopLoss}
-                onChange={(e) => setSetupStopLoss(e.target.value)}
+                onChange={e => {
+                  setSetupStopLoss(e.target.value);
+                  setSetupSLWasSet(true);
+                }}
                 className="bg-secondary/50 border-border font-mono"
               />
               {isFetchingCmp && (
                 <p className="text-xs text-muted-foreground">Fetching daily low...</p>
               )}
-              {dailyLow && (
+              {dailyLow !== undefined && dailyLow !== null && (
                 <p className="text-xs text-primary font-semibold">
-                  Daily Low: ₹{dailyLow.toFixed(2)}
+                  Daily Low: ₹{Number(dailyLow).toFixed(2)}
                 </p>
               )}
             </div>
