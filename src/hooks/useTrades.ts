@@ -570,7 +570,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
 
   const importCSVTrades = async (trades: Array<{
     symbol: string;
-    tradeType: 'LONG' | 'SHORT';
+    tradeType: 'LONG' | 'SHORT' | 'IPO';
     entryDate: string;
     entryPrice: number;
     quantity: number;
@@ -579,6 +579,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
       exitPrice: number;
       quantity: number;
     }>;
+    notes?: string;
   }>) => {
     if (!user) return { imported: 0, skipped: 0 };
 
