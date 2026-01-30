@@ -154,21 +154,32 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
             }
           } else {
             // No entry found: treat as IPO/Sell-only entry
-            // Store for later processing to fetch IPO listing data
-            const key = `SELLONLY_${cleanSymbol}_${dateStr}_${priceNum}`;
+            // Store the sell as an exit - entry date/price will be fetched from IPO data
+            const key = `IPO_${cleanSymbol}`;
             if (!tradeMap.has(key)) {
               tradeMap.set(key, {
                 symbol: cleanSymbol,
                 tradeType: 'IPO',
-                entryDate: dateStr,
-                entryPrice: priceNum,
+                entryDate: dateStr, // Placeholder - will be replaced with listing date
+                entryPrice: 0, // Placeholder - will be replaced with allotment price (upper band)
                 quantity: quantity,
-                exits: [],
-                notes: 'IPO allotment - entry date/price to be fetched',
+                exits: [{
+                  exitDate: dateStr,
+                  exitPrice: priceNum,
+                  quantity: quantity,
+                }],
+                notes: 'IPO trade - fetching allotment price from chittorgarh.com',
               });
             } else {
+              // Add to existing IPO entry
               const existing = tradeMap.get(key)!;
               existing.quantity += quantity;
+              if (!existing.exits) existing.exits = [];
+              existing.exits.push({
+                exitDate: dateStr,
+                exitPrice: priceNum,
+                quantity: quantity,
+              });
             }
           }
         }
