@@ -739,9 +739,9 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
         const tradeId = insertedTrade[0].id;
 
         // Insert exits if any
-        if ((trade.exits || []).length > 0) {
-          const exitsToInsert = (trade.exits || []).map(exit => {
-            const exitPnl = (exit.exitPrice - trade.entryPrice) * exit.quantity;
+        if ((finalTrade.exits || []).length > 0) {
+          const exitsToInsert = (finalTrade.exits || []).map(exit => {
+            const exitPnl = (exit.exitPrice - finalTrade.entryPrice) * exit.quantity;
             return {
               trade_id: tradeId,
               exit_date: exit.exitDate,

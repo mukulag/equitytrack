@@ -14,122 +14,122 @@ interface IPOData {
   error?: string;
 }
 
-async function fetchIPODataFromChittorgarh(year: number = 2025): Promise<IPOData[]> {
+async function fetchIPODataWithAI(symbols: string[], year: number): Promise<IPOData[]> {
   try {
     const url = `https://www.chittorgarh.com/report/ipo-in-india-list-main-board-sme/82/mainboard/?year=${year}`;
     
-    console.log(`Fetching IPO data from ${url}`);
+    console.log(`Fetching IPO page from ${url}`);
     
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
       }
     });
 
     if (!response.ok) {
-      console.error(`Failed to fetch IPO data: ${response.status}`);
+      console.error(`Failed to fetch IPO page: ${response.status}`);
       return [];
     }
 
     const html = await response.text();
+    console.log(`Fetched HTML (${html.length} chars)`);
     
-    // Parse the HTML table to extract IPO data
-    const ipos: IPOData[] = [];
+    // Extract the main table content - look for IPO data patterns
+    // The site uses client-side rendering, but we can try to find pre-rendered content
+    // or use a simpler regex approach for the table structure
     
-    // Find table rows - look for the main table with IPO data
-    const tableRegex = /<tr[^>]*>.*?<\/tr>/gs;
-    const rows = html.match(tableRegex) || [];
+    const symbolList = symbols.map(s => s.toUpperCase()).join(', ');
     
-    console.log(`Found ${rows.length} rows in HTML`);
-    
-    for (const row of rows) {
-      try {
-        // Extract cells from the row
-        const cellRegex = /<td[^>]*>(.*?)<\/td>/gs;
-        const cells = [];
-        let cellMatch;
-        
-        while ((cellMatch = cellRegex.exec(row)) !== null) {
-          // Clean up the cell content (remove HTML tags, entities, etc.)
-          let content = cellMatch[1]
-            .replace(/<[^>]*>/g, '') // Remove HTML tags
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&#039;/g, "'")
-            .replace(/&quot;/g, '"')
-            .trim();
-          cells.push(content);
-        }
-        
-        if (cells.length < 3) continue;
-        
-        // Typically the table structure is:
-        // 0: Company Name, 1: Symbol, 2: Allotment Price, 3: Listing Date, 4: Listing Price, etc.
-        // But this may vary, so we need to be flexible
-        
-        const company = cells[0];
-        const symbol = cells[1]?.toUpperCase();
-        
-        // Try to extract prices and dates from remaining cells
-        let allotmentPrice: number | null = null;
-        let listingDate: string | null = null;
-        let listingPrice: number | null = null;
-        
-        // Parse numeric values for prices
-        for (let i = 2; i < cells.length; i++) {
-          const cell = cells[i];
-          const numValue = parseFloat(cell.replace(/[^\d.]/g, ''));
-          
-          if (!isNaN(numValue) && numValue > 0) {
-            // Assume first price is allotment, second is listing price
-            if (allotmentPrice === null) {
-              allotmentPrice = numValue;
-            } else if (listingPrice === null) {
-              listingPrice = numValue;
-            }
-          }
-          
-          // Try to parse date (look for patterns like DD-Mon-YY or DD/MM/YYYY)
-          if (listingDate === null && cell.match(/\d{1,2}[-\/]\w+[-\/]\d{2,4}/)) {
-            // Parse date like "15-Jan-25" or "15/01/2025"
-            const dateMatch = cell.match(/(\d{1,2})[-\/](\w+|\\d{1,2})[-\/](\d{2,4})/);
-            if (dateMatch) {
-              try {
-                const day = dateMatch[1];
-                const monthStr = dateMatch[2];
-                const year = dateMatch[3].length === 2 ? '20' + dateMatch[3] : dateMatch[3];
-                
-                // If month is numeric
-                const monthNum = isNaN(parseInt(monthStr)) ? new Date(`${monthStr} 1, 2000`).getMonth() + 1 : parseInt(monthStr);
-                const dateStr = `${year}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                
-                // Validate the date
-                if (!isNaN(new Date(dateStr).getTime())) {
-                  listingDate = dateStr;
-                }
-              } catch (e) {
-                console.warn(`Failed to parse date: ${cell}`);
-              }
-            }
-          }
-        }
-        
-        if (symbol && company) {
-          ipos.push({
-            symbol,
-            company,
-            allotmentPrice,
-            listingDate,
-            listingPrice,
-          });
-        }
-      } catch (e) {
-        console.warn(`Failed to parse row:`, e);
-      }
+    // Use AI to extract IPO data from the HTML
+    const apiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!apiKey) {
+      console.error('LOVABLE_API_KEY not configured');
+      return [];
     }
     
-    console.log(`Extracted ${ipos.length} IPOs from HTML`);
-    return ipos;
+    // Truncate HTML to avoid token limits - focus on table data
+    let relevantHtml = html;
+    
+    // Try to find table sections
+    const tableMatch = html.match(/<table[^>]*class[^>]*data[^>]*>[\s\S]*?<\/table>/gi);
+    if (tableMatch && tableMatch.length > 0) {
+      relevantHtml = tableMatch.join('\n');
+      console.log(`Found ${tableMatch.length} data tables`);
+    } else {
+      // Fallback: limit HTML size
+      relevantHtml = html.substring(0, 50000);
+    }
+    
+    const prompt = `Extract IPO data from this HTML page from chittorgarh.com for year ${year}. 
+I need the following stocks: ${symbolList}
+
+For each symbol found, extract:
+- company: Full company name
+- symbol: Stock symbol (without -EQ or other suffixes)
+- allotmentPrice: The UPPER PRICE BAND (issue price) at which shares were allotted. This is NOT the listing price.
+- listingDate: The date when the stock was listed on exchange (format: YYYY-MM-DD)
+- listingPrice: The price at which the stock opened on listing day
+
+Return ONLY a JSON array with objects containing these fields. If a symbol is not found, don't include it.
+Return ONLY the JSON array, no other text.
+
+HTML:
+${relevantHtml}`;
+
+    console.log(`Calling AI to extract IPO data for: ${symbolList}`);
+    
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a data extraction assistant. Extract structured IPO data from HTML tables. Return only valid JSON arrays with no markdown formatting or extra text.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error(`AI request failed: ${aiResponse.status}`, errorText);
+      return [];
+    }
+
+    const aiData = await aiResponse.json();
+    const content = aiData.choices?.[0]?.message?.content || '';
+    
+    console.log('AI response:', content);
+    
+    // Parse the JSON response
+    try {
+      // Clean up the response - remove markdown code blocks if present
+      let jsonStr = content.trim();
+      if (jsonStr.startsWith('```json')) {
+        jsonStr = jsonStr.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (jsonStr.startsWith('```')) {
+        jsonStr = jsonStr.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      const ipos = JSON.parse(jsonStr) as IPOData[];
+      console.log(`Extracted ${ipos.length} IPOs from AI response`);
+      return ipos;
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', parseError);
+      return [];
+    }
   } catch (error) {
     console.error('Error fetching IPO data:', error);
     return [];
@@ -152,29 +152,46 @@ serve(async (req: Request) => {
     }
 
     const currentYear = year || new Date().getFullYear();
-    console.log(`Fetching IPO data for year ${currentYear}`);
+    console.log(`Fetching IPO data for symbols: ${symbols.join(', ')} for year ${currentYear}`);
 
-    // Fetch IPO data for the specified year
-    const allIpos = await fetchIPODataFromChittorgarh(currentYear);
+    // Try current year first
+    let matchedIpos = await fetchIPODataWithAI(symbols, currentYear);
     
     // Filter to only the requested symbols
     const symbolSet = new Set(symbols.map((s: string) => s.toUpperCase()));
-    const matchedIpos = allIpos.filter(ipo => symbolSet.has(ipo.symbol));
+    matchedIpos = matchedIpos.filter(ipo => symbolSet.has(ipo.symbol?.toUpperCase()));
     
-    console.log(`Matched ${matchedIpos.length} IPOs out of ${symbols.length} requested symbols`);
+    console.log(`Found ${matchedIpos.length} matching IPOs for current year`);
     
-    // If no matches found for current year, try previous years
-    if (matchedIpos.length === 0 && currentYear > 2020) {
-      for (let y = currentYear - 1; y >= currentYear - 4; y--) {
-        const previousYearIpos = await fetchIPODataFromChittorgarh(y);
-        const matches = previousYearIpos.filter(ipo => symbolSet.has(ipo.symbol));
+    // If some symbols not found, try previous years
+    const foundSymbols = new Set(matchedIpos.map(ipo => ipo.symbol?.toUpperCase()));
+    const missingSymbols = symbols.filter((s: string) => !foundSymbols.has(s.toUpperCase()));
+    
+    if (missingSymbols.length > 0 && currentYear > 2020) {
+      console.log(`Searching for missing symbols in previous years: ${missingSymbols.join(', ')}`);
+      
+      for (let y = currentYear - 1; y >= currentYear - 5; y--) {
+        if (missingSymbols.length === 0) break;
+        
+        const previousYearIpos = await fetchIPODataWithAI(missingSymbols, y);
+        const matches = previousYearIpos.filter(ipo => 
+          missingSymbols.some(s => s.toUpperCase() === ipo.symbol?.toUpperCase())
+        );
+        
         if (matches.length > 0) {
-          matchedIpos.push(...matches);
           console.log(`Found ${matches.length} IPOs in year ${y}`);
-          if (matchedIpos.length >= symbols.length) break;
+          matchedIpos.push(...matches);
+          
+          // Remove found symbols from missing list
+          for (const match of matches) {
+            const idx = missingSymbols.findIndex(s => s.toUpperCase() === match.symbol?.toUpperCase());
+            if (idx !== -1) missingSymbols.splice(idx, 1);
+          }
         }
       }
     }
+
+    console.log(`Returning ${matchedIpos.length} IPOs total`);
 
     return new Response(
       JSON.stringify({ ipos: matchedIpos }),
