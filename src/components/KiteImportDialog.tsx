@@ -74,8 +74,15 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
     const qtyIdx = getCol(['quantity', 'qty', 'traded_qty']);
     const priceIdx = getCol(['price', 'trade_price', 'avg_price', 'average_price']);
     
-    // Map trades by (symbol, entryDate, entryPrice) to link entries and exits
-    const tradeMap = new Map<string, ParsedCSVTrade>();
+    // First pass: collect all buy and sell transactions per symbol
+    interface Transaction {
+      date: string;
+      price: number;
+      quantity: number;
+      isBuy: boolean;
+    }
+    
+    const transactionsBySymbol = new Map<string, Transaction[]>();
     
     // Parse each row
     for (let i = 1; i < lines.length; i++) {
@@ -113,78 +120,134 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
         const priceNum = parseFloat(price);
         const dateStr = parsedDate.toISOString().split('T')[0];
         
-        // Create a key to group entry and exit
-        // If isBuy (entry), store it; if !isBuy (exit), find and add to corresponding entry
-        if (isBuy) {
-          // This is an entry
-          const key = `${cleanSymbol}_${dateStr}_${priceNum}`;
+        if (!transactionsBySymbol.has(cleanSymbol)) {
+          transactionsBySymbol.set(cleanSymbol, []);
+        }
+        transactionsBySymbol.get(cleanSymbol)!.push({
+          date: dateStr,
+          price: priceNum,
+          quantity,
+          isBuy,
+        });
+      } catch (e) {
+        console.warn('Failed to parse CSV line:', line, e);
+      }
+    }
+    
+    // Second pass: analyze each symbol to detect IPO allotments
+    const tradeMap = new Map<string, ParsedCSVTrade>();
+    
+    for (const [symbol, transactions] of transactionsBySymbol) {
+      // Sort by date
+      transactions.sort((a, b) => a.date.localeCompare(b.date));
+      
+      // Calculate total buy and sell quantities
+      const totalBuyQty = transactions.filter(t => t.isBuy).reduce((sum, t) => sum + t.quantity, 0);
+      const totalSellQty = transactions.filter(t => !t.isBuy).reduce((sum, t) => sum + t.quantity, 0);
+      
+      // If sells exceed buys, the excess is from IPO allotment
+      const ipoAllotmentQty = Math.max(0, totalSellQty - totalBuyQty);
+      
+      console.log(`Symbol ${symbol}: Buy=${totalBuyQty}, Sell=${totalSellQty}, IPO Allotment=${ipoAllotmentQty}`);
+      
+      // Process transactions
+      let remainingIpoQty = ipoAllotmentQty;
+      
+      // Group buys into trades
+      for (const txn of transactions) {
+        if (txn.isBuy) {
+          // Regular buy entry
+          const key = `${symbol}_${txn.date}_${txn.price}`;
           if (!tradeMap.has(key)) {
             tradeMap.set(key, {
-              symbol: cleanSymbol,
+              symbol,
               tradeType: 'LONG',
-              entryDate: dateStr,
-              entryPrice: priceNum,
-              quantity: quantity,
+              entryDate: txn.date,
+              entryPrice: txn.price,
+              quantity: txn.quantity,
               exits: [],
             });
           } else {
-            // Merge quantities if same entry
             const existing = tradeMap.get(key)!;
-            existing.quantity += quantity;
+            existing.quantity += txn.quantity;
           }
-        } else {
-          // This is an exit - try to find the most recent entry for this symbol
-          const entriesForSymbol = Array.from(tradeMap.entries())
-            .filter(([key]) => key.startsWith(cleanSymbol + '_'))
-            .sort(([keyA], [keyB]) => keyB[0].localeCompare(keyA[0])); // Sort by date desc
-
-          if (entriesForSymbol.length > 0) {
-            const [, trade] = entriesForSymbol[0];
-            if (!trade.exits) trade.exits = [];
-            // Check if this quantity is already accounted for
-            const existingExitQty = (trade.exits || []).reduce((sum, e) => sum + e.quantity, 0);
-            const remainingQty = trade.quantity - existingExitQty;
-            if (remainingQty > 0) {
-              const exitQty = Math.min(quantity, remainingQty);
-              (trade.exits || []).push({
-                exitDate: dateStr,
-                exitPrice: priceNum,
-                quantity: exitQty,
-              });
+        }
+      }
+      
+      // If there's IPO allotment quantity, create an IPO trade
+      if (ipoAllotmentQty > 0) {
+        // Find the first sell date as a reference (listing date)
+        const firstSell = transactions.find(t => !t.isBuy);
+        const ipoKey = `IPO_${symbol}`;
+        
+        if (firstSell) {
+          // Collect IPO exits (sells that exceed buy quantity)
+          const ipoExits: ParsedCSVExit[] = [];
+          let remainingIpoExitQty = ipoAllotmentQty;
+          
+          // Track how much of each sell is from bought shares vs IPO shares
+          let remainingBoughtShares = totalBuyQty;
+          
+          for (const txn of transactions) {
+            if (!txn.isBuy && remainingIpoExitQty > 0) {
+              // This sell could be from bought shares or IPO shares
+              // First use up bought shares
+              const sellFromBought = Math.min(remainingBoughtShares, txn.quantity);
+              remainingBoughtShares -= sellFromBought;
+              
+              // Remaining is from IPO
+              const sellFromIpo = txn.quantity - sellFromBought;
+              if (sellFromIpo > 0) {
+                ipoExits.push({
+                  exitDate: txn.date,
+                  exitPrice: txn.price,
+                  quantity: Math.min(sellFromIpo, remainingIpoExitQty),
+                });
+                remainingIpoExitQty -= sellFromIpo;
+              }
             }
-          } else {
-            // No entry found: treat as IPO/Sell-only entry
-            // Store the sell as an exit - entry date/price will be fetched from IPO data
-            const key = `IPO_${cleanSymbol}`;
-            if (!tradeMap.has(key)) {
-              tradeMap.set(key, {
-                symbol: cleanSymbol,
-                tradeType: 'IPO',
-                entryDate: dateStr, // Placeholder - will be replaced with listing date
-                entryPrice: 0, // Placeholder - will be replaced with allotment price (upper band)
-                quantity: quantity,
-                exits: [{
-                  exitDate: dateStr,
-                  exitPrice: priceNum,
-                  quantity: quantity,
-                }],
-                notes: 'IPO trade - fetching allotment price from chittorgarh.com',
-              });
-            } else {
-              // Add to existing IPO entry
-              const existing = tradeMap.get(key)!;
-              existing.quantity += quantity;
-              if (!existing.exits) existing.exits = [];
-              existing.exits.push({
-                exitDate: dateStr,
-                exitPrice: priceNum,
-                quantity: quantity,
-              });
+          }
+          
+          tradeMap.set(ipoKey, {
+            symbol,
+            tradeType: 'IPO',
+            entryDate: firstSell.date, // Will be replaced with actual listing date
+            entryPrice: 0, // Will be replaced with allotment price (upper band)
+            quantity: ipoAllotmentQty,
+            exits: ipoExits,
+            notes: 'IPO allotment - fetching entry price from chittorgarh.com',
+          });
+        }
+      }
+      
+      // Match sells to regular trades (excluding IPO sells already accounted for)
+      let remainingBoughtForExits = totalBuyQty;
+      for (const txn of transactions) {
+        if (!txn.isBuy && remainingBoughtForExits > 0) {
+          const sellQtyFromBuys = Math.min(remainingBoughtForExits, txn.quantity);
+          remainingBoughtForExits -= sellQtyFromBuys;
+          
+          if (sellQtyFromBuys > 0) {
+            // Find the most recent entry for this symbol
+            const entriesForSymbol = Array.from(tradeMap.entries())
+              .filter(([key, trade]) => key.startsWith(`${symbol}_`) && trade.tradeType === 'LONG')
+              .sort(([keyA], [keyB]) => keyB.localeCompare(keyA)); // Sort by date desc
+
+            if (entriesForSymbol.length > 0) {
+              const [, trade] = entriesForSymbol[0];
+              if (!trade.exits) trade.exits = [];
+              const existingExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
+              const remainingQty = trade.quantity - existingExitQty;
+              if (remainingQty > 0) {
+                trade.exits.push({
+                  exitDate: txn.date,
+                  exitPrice: txn.price,
+                  quantity: Math.min(sellQtyFromBuys, remainingQty),
+                });
+              }
             }
           }
         }
-      } catch (e) {
-        console.warn('Failed to parse CSV line:', line, e);
       }
     }
 
