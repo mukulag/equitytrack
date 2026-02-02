@@ -44,7 +44,7 @@ export const useTrades = () => {
         return {
           id: trade.id,
           symbol: trade.symbol,
-          tradeType: trade.trade_type as 'LONG' | 'SHORT',
+          tradeType: trade.trade_type as 'LONG' | 'SHORT' | 'IPO',
           entryDate: trade.entry_date,
           entryTime: trade.entry_time || undefined,
           entryPrice: Number(trade.entry_price),
