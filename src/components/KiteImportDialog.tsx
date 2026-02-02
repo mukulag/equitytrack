@@ -251,7 +251,10 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
       }
     }
 
-    return Array.from(tradeMap.values());
+    const result = Array.from(tradeMap.values());
+    console.log('CSV Parsing complete. Parsed trades:', JSON.stringify(result, null, 2));
+    console.log('IPO trades found:', result.filter(t => t.tradeType === 'IPO').length);
+    return result;
   };
 
   const handleCSVImport = async () => {

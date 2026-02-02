@@ -637,6 +637,10 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
 
     console.log('Daily lows map:', Array.from(dailyLowsMap.entries()));
 
+    console.log('Starting CSV import. Total trades to import:', trades.length);
+    console.log('IPO trades to import:', trades.filter(t => t.tradeType === 'IPO').length);
+    console.log('All trades:', JSON.stringify(trades.filter(t => t.tradeType === 'IPO'), null, 2));
+
     for (const trade of trades) {
       try {
         let finalTrade = trade;
