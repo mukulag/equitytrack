@@ -737,7 +737,24 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           notes: finalTrade.notes || 'Imported from CSV',
         }).select('id');
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Insert error for trade:', finalTrade.symbol, insertError);
+          console.error('Trade data being inserted:', {
+            user_id: user.id,
+            symbol: finalTrade.symbol,
+            trade_type: finalTrade.tradeType,
+            entry_date: finalTrade.entryDate,
+            entry_price: finalTrade.entryPrice,
+            quantity: finalTrade.quantity,
+            remaining_quantity: remainingQty,
+            booked_profit: bookedProfit,
+            total_pnl: totalPnl,
+            status: status,
+            setup_stop_loss: setupSL,
+            notes: finalTrade.notes || 'Imported from CSV',
+          });
+          throw insertError;
+        }
         if (!insertedTrade || insertedTrade.length === 0) throw new Error('Failed to insert trade');
 
         const tradeId = insertedTrade[0].id;
