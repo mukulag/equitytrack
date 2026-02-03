@@ -62,18 +62,27 @@ async function fetchIPODataWithAI(symbols: string[], year: number): Promise<IPOD
       relevantHtml = html.substring(0, 50000);
     }
     
-    const prompt = `Extract IPO data from this HTML page from chittorgarh.com for year ${year}. 
-I need the following stocks: ${symbolList}
+    const prompt = `Extract ALL IPO data from this HTML page from chittorgarh.com for year ${year}. 
 
-For each symbol found, extract:
-- company: Full company name
-- symbol: Stock symbol (without -EQ or other suffixes)
-- allotmentPrice: The UPPER PRICE BAND (issue price) at which shares were allotted. This is NOT the listing price.
-- listingDate: The date when the stock was listed on exchange (format: YYYY-MM-DD)
-- listingPrice: The price at which the stock opened on listing day
+This page shows a table with columns: Company, Opening Date, Closing Date, Listing Date, Issue Price, Total Issue Amount, Listing at, Lead Manager.
 
-Return ONLY a JSON array with objects containing these fields. If a symbol is not found, don't include it.
-Return ONLY the JSON array, no other text.
+Extract ALL IPOs from the table with their data:
+- company: Full company name (e.g., "LG Electronics India Ltd.", "Emmvee Photovoltaic Power Ltd.")
+- nseSymbol: NSE trading symbol if visible, or try to derive from company name (e.g., LG Electronics India → LGEINDIA, Emmvee → EMMVEE)
+- allotmentPrice: The Issue Price column value. If it shows a range like "₹1080-₹1140", use the HIGHER number (1140). Must be a realistic share price.
+- listingDate: The Listing Date column (format: YYYY-MM-DD)
+
+IMPORTANT RULES:
+1. Extract every IPO row from the table that has data
+2. The NSE symbol is usually the company name abbreviated (LG Electronics = LGEINDIA, ICICI Prudential AMC = ICICIAMC)
+3. Issue Price for mainboard IPOs is typically between 100 and 5000 rupees
+4. If a row has no Issue Price yet, skip it
+5. Return ALL IPOs you find, I will filter to the ones I need
+
+I'm looking for these symbols specifically: ${symbolList}
+
+Return ONLY a valid JSON array with objects containing: company, nseSymbol, allotmentPrice, listingDate.
+No markdown formatting, no explanation text, just the JSON array.
 
 HTML:
 ${relevantHtml}`;
@@ -123,8 +132,26 @@ ${relevantHtml}`;
         jsonStr = jsonStr.replace(/^```\s*/, '').replace(/\s*```$/, '');
       }
       
-      const ipos = JSON.parse(jsonStr) as IPOData[];
+      const rawIpos = JSON.parse(jsonStr) as Array<{
+        company?: string;
+        symbol?: string;
+        nseSymbol?: string;
+        allotmentPrice?: number;
+        listingDate?: string;
+        listingPrice?: number;
+      }>;
+      
+      // Normalize the response - handle both 'symbol' and 'nseSymbol' fields
+      const ipos: IPOData[] = rawIpos.map(ipo => ({
+        symbol: (ipo.symbol || ipo.nseSymbol || '').toUpperCase(),
+        company: ipo.company || '',
+        allotmentPrice: ipo.allotmentPrice || null,
+        listingDate: ipo.listingDate || null,
+        listingPrice: ipo.listingPrice || null,
+      }));
+      
       console.log(`Extracted ${ipos.length} IPOs from AI response`);
+      console.log('IPO symbols found:', ipos.map(i => `${i.symbol} (${i.company}) @ ${i.allotmentPrice}`));
       return ipos;
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', parseError);
