@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.send-feedback-email]
 verify_jwt = false
+
+[auth]
+enable_signup = true
