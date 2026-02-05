@@ -123,7 +123,18 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
             parsedDate = new Date(date);
           }
           
-        });
+         const isBuy = type?.toUpperCase().includes('BUY') || type?.toUpperCase() === 'B';
+         const transaction: Transaction = {
+           date: parsedDate.toISOString().split('T')[0],
+           price: parseFloat(price) || 0,
+           quantity: parseInt(qty) || 0,
+           isBuy,
+         };
+         
+         if (!transactionsBySymbol.has(symbol)) {
+           transactionsBySymbol.set(symbol, []);
+         }
+         transactionsBySymbol.get(symbol)!.push(transaction);
       } catch (e) {
         console.warn('Failed to parse CSV line:', line, e);
       }
