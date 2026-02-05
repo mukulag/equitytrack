@@ -668,19 +668,11 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
                 };
               } else {
                 console.warn(`Incomplete IPO data for ${trade.symbol}:`, ipoInfo);
-                // If incomplete data, treat as regular trade
-                finalTrade = {
-                  ...trade,
-                  tradeType: 'LONG' as const,
-                };
+                // Keep as IPO but don't update dates/prices
               }
             } else {
               console.warn(`No IPO data found for ${trade.symbol}`, ipoData);
-              // If no IPO data found, treat as regular trade
-              finalTrade = {
-                ...trade,
-                tradeType: 'LONG' as const,
-              };
+              // Keep as IPO - user manually specified it as IPO
             }
           } catch (ipoFetchError) {
             console.warn(`Failed to fetch IPO data for ${trade.symbol}:`, ipoFetchError);

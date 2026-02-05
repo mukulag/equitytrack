@@ -145,13 +145,13 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
       const totalBuyQty = transactions.filter(t => t.isBuy).reduce((sum, t) => sum + t.quantity, 0);
       const totalSellQty = transactions.filter(t => !t.isBuy).reduce((sum, t) => sum + t.quantity, 0);
       
-      // If sells exceed buys, the excess is from IPO allotment
-      const ipoAllotmentQty = Math.max(0, totalSellQty - totalBuyQty);
+      // NOTE: Automatic IPO detection removed as it was unreliable
+      // Users should manually create IPO trades if needed
+      const ipoAllotmentQty = 0;
       
-      console.log(`Symbol ${symbol}: Buy=${totalBuyQty}, Sell=${totalSellQty}, IPO Allotment=${ipoAllotmentQty}`);
+      console.log(`Symbol ${symbol}: Buy=${totalBuyQty}, Sell=${totalSellQty}`);
       
       // Process transactions
-      let remainingIpoQty = ipoAllotmentQty;
       
       // Group buys into trades
       for (const txn of transactions) {
@@ -171,52 +171,6 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
             const existing = tradeMap.get(key)!;
             existing.quantity += txn.quantity;
           }
-        }
-      }
-      
-      // If there's IPO allotment quantity, create an IPO trade
-      if (ipoAllotmentQty > 0) {
-        // Find the first sell date as a reference (listing date)
-        const firstSell = transactions.find(t => !t.isBuy);
-        const ipoKey = `IPO_${symbol}`;
-        
-        if (firstSell) {
-          // Collect IPO exits (sells that exceed buy quantity)
-          const ipoExits: ParsedCSVExit[] = [];
-          let remainingIpoExitQty = ipoAllotmentQty;
-          
-          // Track how much of each sell is from bought shares vs IPO shares
-          let remainingBoughtShares = totalBuyQty;
-          
-          for (const txn of transactions) {
-            if (!txn.isBuy && remainingIpoExitQty > 0) {
-              // This sell could be from bought shares or IPO shares
-              // First use up bought shares
-              const sellFromBought = Math.min(remainingBoughtShares, txn.quantity);
-              remainingBoughtShares -= sellFromBought;
-              
-              // Remaining is from IPO
-              const sellFromIpo = txn.quantity - sellFromBought;
-              if (sellFromIpo > 0) {
-                ipoExits.push({
-                  exitDate: txn.date,
-                  exitPrice: txn.price,
-                  quantity: Math.min(sellFromIpo, remainingIpoExitQty),
-                });
-                remainingIpoExitQty -= sellFromIpo;
-              }
-            }
-          }
-          
-          tradeMap.set(ipoKey, {
-            symbol,
-            tradeType: 'IPO',
-            entryDate: firstSell.date, // Will be replaced with actual listing date
-            entryPrice: 0, // Will be replaced with allotment price (upper band)
-            quantity: ipoAllotmentQty,
-            exits: ipoExits,
-            notes: 'IPO allotment - fetching entry price from chittorgarh.com',
-          });
         }
       }
       
@@ -253,7 +207,6 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
 
     const result = Array.from(tradeMap.values());
     console.log('CSV Parsing complete. Parsed trades:', JSON.stringify(result, null, 2));
-    console.log('IPO trades found:', result.filter(t => t.tradeType === 'IPO').length);
     return result;
   };
 
