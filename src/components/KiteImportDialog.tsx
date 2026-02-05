@@ -108,26 +108,21 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
           price = values[priceIdx];
         }
 
-        const parsedDate = new Date(date);
-        if (isNaN(parsedDate.getTime())) continue;
-        
-        // Filter by fromDate
-        if (parsedDate < new Date(fromDate)) continue;
-
-        const isBuy = type?.toUpperCase() === 'BUY' || type?.toUpperCase() === 'B';
-        const cleanSymbol = symbol.replace('-EQ', '').replace('-BE', '');
-        const quantity = Math.abs(parseInt(qty));
-        const priceNum = parseFloat(price);
-        const dateStr = parsedDate.toISOString().split('T')[0];
-        
-        if (!transactionsBySymbol.has(cleanSymbol)) {
-          transactionsBySymbol.set(cleanSymbol, []);
-        }
-        transactionsBySymbol.get(cleanSymbol)!.push({
-          date: dateStr,
-          price: priceNum,
-          quantity,
-          isBuy,
+          // Parse date - handle DD-MM-YYYY format
+          let parsedDate: Date;
+          if (date.includes('-')) {
+            const parts = date.split('-');
+            if (parts.length === 3 && parts[0].length === 2) {
+              // DD-MM-YYYY format
+              parsedDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            } else {
+              // Assume YYYY-MM-DD or other standard format
+              parsedDate = new Date(date);
+            }
+          } else {
+            parsedDate = new Date(date);
+          }
+          
         });
       } catch (e) {
         console.warn('Failed to parse CSV line:', line, e);
@@ -174,32 +169,65 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
         }
       }
       
-      // Match sells to regular trades (excluding IPO sells already accounted for)
+      // Handle sell transactions - match to buys or create separate entries
+      const sellTransactions = transactions.filter(t => !t.isBuy);
       let remainingBoughtForExits = totalBuyQty;
-      for (const txn of transactions) {
-        if (!txn.isBuy && remainingBoughtForExits > 0) {
-          const sellQtyFromBuys = Math.min(remainingBoughtForExits, txn.quantity);
-          remainingBoughtForExits -= sellQtyFromBuys;
+      
+      for (const txn of sellTransactions) {
+        // First, try to match sell to existing buy trades as exits
+        let sellQtyMatched = 0;
+        if (remainingBoughtForExits > 0) {
+          sellQtyMatched = Math.min(remainingBoughtForExits, txn.quantity);
+          remainingBoughtForExits -= sellQtyMatched;
           
-          if (sellQtyFromBuys > 0) {
-            // Find the most recent entry for this symbol
-            const entriesForSymbol = Array.from(tradeMap.entries())
-              .filter(([key, trade]) => key.startsWith(`${symbol}_`) && trade.tradeType === 'LONG')
-              .sort(([keyA], [keyB]) => keyB.localeCompare(keyA)); // Sort by date desc
+          // Match sells to existing buy trades (exits)
+          const entriesForSymbol = Array.from(tradeMap.entries())
+            .filter(([key, trade]) => key.startsWith(`${symbol}_`) && trade.tradeType === 'LONG')
+            .sort(([keyA], [keyB]) => keyB.localeCompare(keyA)); // Sort by date desc
 
-            if (entriesForSymbol.length > 0) {
-              const [, trade] = entriesForSymbol[0];
-              if (!trade.exits) trade.exits = [];
-              const existingExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
-              const remainingQty = trade.quantity - existingExitQty;
-              if (remainingQty > 0) {
-                trade.exits.push({
-                  exitDate: txn.date,
-                  exitPrice: txn.price,
-                  quantity: Math.min(sellQtyFromBuys, remainingQty),
-                });
-              }
+          if (entriesForSymbol.length > 0) {
+            const [, trade] = entriesForSymbol[0];
+            if (!trade.exits) trade.exits = [];
+            const existingExitQty = trade.exits.reduce((sum, e) => sum + e.quantity, 0);
+            const remainingQty = trade.quantity - existingExitQty;
+            if (remainingQty > 0) {
+              trade.exits.push({
+                exitDate: txn.date,
+                exitPrice: txn.price,
+                quantity: Math.min(sellQtyMatched, remainingQty),
+              });
             }
+          }
+        }
+        
+        // Handle unmatched sell quantity (sell-only transactions)
+        const unmatchedSellQty = txn.quantity - sellQtyMatched;
+        if (unmatchedSellQty > 0) {
+          // Create a LONG trade entry for unmatched sells
+          // These will need manual entry price adjustment later
+          const key = `${symbol}_${txn.date}_${txn.price}_SELL`;
+          if (!tradeMap.has(key)) {
+            tradeMap.set(key, {
+              symbol,
+              tradeType: 'LONG',
+              entryDate: txn.date,
+              entryPrice: txn.price,
+              quantity: unmatchedSellQty,
+              exits: [{
+                exitDate: txn.date,
+                exitPrice: txn.price,
+                quantity: unmatchedSellQty,
+              }],
+            });
+          } else {
+            const existing = tradeMap.get(key)!;
+            existing.quantity += unmatchedSellQty;
+            if (!existing.exits) existing.exits = [];
+            existing.exits.push({
+              exitDate: txn.date,
+              exitPrice: txn.price,
+              quantity: unmatchedSellQty,
+            });
           }
         }
       }
