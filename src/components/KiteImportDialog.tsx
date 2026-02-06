@@ -159,11 +159,10 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
       
       // Process transactions
       
-      // Group buys into trades
+      // Group buys into trades (aggregate by symbol+date, weighted average price)
       for (const txn of transactions) {
         if (txn.isBuy) {
-          // Regular buy entry
-          const key = `${symbol}_${txn.date}_${txn.price}`;
+          const key = `${symbol}_${txn.date}`;
           if (!tradeMap.has(key)) {
             tradeMap.set(key, {
               symbol,
@@ -175,7 +174,15 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
             });
           } else {
             const existing = tradeMap.get(key)!;
-            existing.quantity += txn.quantity;
+            const existingQty = existing.quantity || 0;
+            const incomingQty = txn.quantity || 0;
+            const existingPrice = existing.entryPrice || 0;
+            const incomingPrice = txn.price || 0;
+            const newQty = existingQty + incomingQty;
+            // Weighted average entry price
+            const newPrice = newQty > 0 ? (existingPrice * existingQty + incomingPrice * incomingQty) / newQty : incomingPrice;
+            existing.entryPrice = newPrice;
+            existing.quantity = newQty;
           }
         }
       }
