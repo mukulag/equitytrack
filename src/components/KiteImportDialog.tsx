@@ -172,6 +172,7 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
               quantity: txn.quantity,
               exits: [],
             });
+            console.log(`Created aggregated buy entry for ${key}: qty=${txn.quantity}, price=${txn.price}`);
           } else {
             const existing = tradeMap.get(key)!;
             const existingQty = existing.quantity || 0;
@@ -183,6 +184,7 @@ export function KiteImportDialog({ kiteToken, onImportTodaysOrders, onImportCSV,
             const newPrice = newQty > 0 ? (existingPrice * existingQty + incomingPrice * incomingQty) / newQty : incomingPrice;
             existing.entryPrice = newPrice;
             existing.quantity = newQty;
+            console.log(`Merged into aggregated buy entry for ${key}: new qty=${newQty}, new price=${newPrice}`);
           }
         }
       }
