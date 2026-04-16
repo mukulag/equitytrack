@@ -52,7 +52,7 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
   const [cmp, setCmp] = useState<number | null>(null);
   const [dailyLow, setDailyLow] = useState<number | null>(null);
   const [isFetchingCmp, setIsFetchingCmp] = useState(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch CMP and daily low as user types in symbol field
   useEffect(() => {
