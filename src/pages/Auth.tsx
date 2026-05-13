@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/contexts/AuthContext';
 import { Footer } from '@/components/Footer';
 import { toast } from 'sonner';
+import { lovable } from '@/integrations/lovable';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
