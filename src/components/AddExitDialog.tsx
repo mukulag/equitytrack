@@ -49,7 +49,7 @@ export const AddExitDialog = ({ trade, onAddExit }: AddExitDialogProps) => {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-          <LogOut className="h-3 w-3" />
+          <ArrowRightFromLine className="h-3 w-3" />
           Exit
         </Button>
       </DialogTrigger>
