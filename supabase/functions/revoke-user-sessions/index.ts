@@ -16,11 +16,11 @@ export default async (req: Request) => {
       return new Response(JSON.stringify({ error: 'user_id is required' }), { status: 400 });
     }
 
-    // Delete all sessions for this user (requires service role)
-    const { error } = await supabase.from('auth.sessions').delete().eq('user_id', user_id);
+    // Use the admin API to sign out the user (revokes all sessions)
+    const { error } = await supabase.auth.admin.signOut(user_id, 'global');
 
     if (error) {
-      console.error('Error deleting sessions:', error);
+      console.error('Error revoking sessions:', error);
       return new Response(JSON.stringify({ error: 'Failed to revoke sessions' }), { status: 500 });
     }
 
