@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogOut } from 'lucide-react';
+import { ArrowRightFromLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
