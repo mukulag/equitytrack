@@ -65,6 +65,20 @@ const Auth = () => {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    const result = await lovable.auth.signInWithOAuth('google', {
+      redirect_uri: window.location.origin,
+    });
+    setIsLoading(false);
+
+    if (result.error) {
+      toast.error(result.error.message || 'Google sign in failed');
+    }
+    // If redirected, browser will redirect to Google
+    // If tokens returned, session is already set
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 flex items-center justify-center p-4">
