@@ -57,23 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    try {
-      // First attempt to revoke server-side sessions for the current user
-      if (session?.user) {
-        try {
-          await supabase.functions.invoke('revoke-user-sessions', {
-            body: { user_id: session.user.id },
-          });
-        } catch (e) {
-          // If server-side revoke fails, continue with client sign out
-          console.error('Failed to revoke server sessions:', e);
-        }
-      }
-
-      // Client-side sign out
-      await supabase.auth.signOut();
-
-      // Clear any lingering auth-related localStorage entries to reduce risk of token leakage
+    const clearLocalAuthArtifacts = () => {
       try {
         Object.keys(localStorage).forEach((k) => {
           if (k.toLowerCase().includes('supabase') || k.toLowerCase().includes('sb-') || k.toLowerCase().includes('auth')) {
@@ -81,20 +65,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         });
       } catch (e) {
-        // ignore
+        console.error('Failed to clear local auth storage:', e);
       }
 
-      // Remove access tokens from URL (if present)
       if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
         if (url.hash && (url.hash.includes('access_token') || url.hash.includes('refresh_token') || url.hash.includes('type='))) {
           window.history.replaceState({}, '', url.pathname + url.search);
         }
-        // Redirect to auth route explicitly
-        window.location.href = '/auth';
       }
+    };
+
+    setUser(null);
+    setSession(null);
+    setLoading(false);
+
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
     } catch (e) {
-      console.error('Error signing out:', e);
+      console.error('Error signing out from local session:', e);
+    } finally {
+      clearLocalAuthArtifacts();
+
+      if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+        window.location.replace('/auth');
+      }
     }
   };
 
