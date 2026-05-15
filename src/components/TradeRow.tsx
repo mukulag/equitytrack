@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { computeTradeMetrics } from '@/lib/charges';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,9 +75,8 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
   const slDistance = activeStopLoss ? (trade.entryPrice - activeStopLoss) : null;
   const slPercent = activeStopLoss ? ((activeStopLoss - trade.entryPrice) / trade.entryPrice * 100) : null;
   const currentRPT = slDistance && trade.remainingQuantity ? slDistance * trade.remainingQuantity : null;
-  const unrealizedPnl = trade.currentPrice && trade.remainingQuantity > 0
-    ? (trade.currentPrice - trade.entryPrice) * trade.remainingQuantity
-    : 0;
+  const metrics = computeTradeMetrics(trade);
+  const unrealizedPnl = metrics.unrealizedPnl;
   const positionSize = trade.entryPrice * trade.quantity;
 
   const handlePriceSave = () => {
