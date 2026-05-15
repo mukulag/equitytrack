@@ -203,12 +203,45 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </span>
         </td>
         <td className="p-4">
-          <Badge variant="outline" className={cn('text-xs', 
-            trade.tradeType === 'LONG' ? 'border-success/50 text-success' : 
-            trade.tradeType === 'SHORT' ? 'border-destructive/50 text-destructive' : 
-            'border-primary/50 text-primary')}>
-            {trade.tradeType}
-          </Badge>
+          <span className="font-mono text-sm text-muted-foreground" title="Total Zerodha charges (entry + exit)">
+            {formatCurrency(metrics.totalCharges)}
+          </span>
+          {trade.isMtf && metrics.mtfInterest > 0 && (
+            <div className="text-xs text-warning font-mono mt-0.5" title="MTF interest accrued">
+              + {formatCurrency(metrics.mtfInterest)} int
+            </div>
+          )}
+        </td>
+        <td className="p-4">
+          <span className={cn('font-mono text-sm font-semibold',
+            metrics.netPnl > 0 && 'profit-text',
+            metrics.netPnl < 0 && 'loss-text',
+            metrics.netPnl === 0 && 'text-muted-foreground'
+          )}>
+            {metrics.netPnl > 0 ? '+' : ''}{formatCurrency(metrics.netPnl)}
+          </span>
+        </td>
+        <td className="p-4">
+          <span className={cn('font-mono text-sm',
+            metrics.netMarginPercent > 0 && 'profit-text',
+            metrics.netMarginPercent < 0 && 'loss-text',
+            metrics.netMarginPercent === 0 && 'text-muted-foreground'
+          )}>
+            {metrics.netMarginPercent > 0 ? '+' : ''}{metrics.netMarginPercent.toFixed(2)}%
+          </span>
+        </td>
+        <td className="p-4">
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className={cn('text-xs', 
+              trade.tradeType === 'LONG' ? 'border-success/50 text-success' : 
+              trade.tradeType === 'SHORT' ? 'border-destructive/50 text-destructive' : 
+              'border-primary/50 text-primary')}>
+              {trade.tradeType}
+            </Badge>
+            {trade.isMtf && (
+              <Badge variant="outline" className="text-xs border-warning/50 text-warning">MTF</Badge>
+            )}
+          </div>
         </td>
         <td className="p-4">
           <div className="flex items-center gap-1">
@@ -266,7 +299,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
                 {formatCurrency(exit.pnl)}
               </span>
             </td>
-            <td colSpan={2}></td>
+            <td colSpan={5}></td>
             <td className="p-4">
               <div className="flex items-center gap-1">
                 <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
