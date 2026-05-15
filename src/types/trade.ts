@@ -27,4 +27,6 @@ export interface Trade {
   totalPnl: number;
   remainingQuantity: number;
   bookedProfit: number;
+  isMtf?: boolean;
+  marginContribution?: number | null;
 }

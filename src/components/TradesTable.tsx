@@ -96,6 +96,9 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Status</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Booked</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Unrealized</th>
+                <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Charges</th>
+                <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Net P&L</th>
+                <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Net %</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Type</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Actions</th>
               </tr>

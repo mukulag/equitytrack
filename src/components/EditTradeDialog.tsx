@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Trade, TradeType } from '@/types/trade';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface EditTradeDialogProps {
   trade: Trade;
@@ -34,6 +35,8 @@ interface EditTradeDialogProps {
     target: number | null;
     targetRPT: number | null;
     notes: string | null;
+    isMtf?: boolean;
+    marginContribution?: number | null;
   }) => void;
 }
 
@@ -50,6 +53,8 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
   const [target, setTarget] = useState(trade.target?.toString() || '');
   const [targetRPT, setTargetRPT] = useState(trade.targetRPT?.toString() || '2000');
   const [notes, setNotes] = useState(trade.notes || '');
+  const [isMtf, setIsMtf] = useState(!!trade.isMtf);
+  const [marginContribution, setMarginContribution] = useState(trade.marginContribution?.toString() || '');
 
   useEffect(() => {
     if (open) {
@@ -64,6 +69,8 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
       setTarget(trade.target?.toString() || '');
       setTargetRPT(trade.targetRPT?.toString() || '2000');
       setNotes(trade.notes || '');
+      setIsMtf(!!trade.isMtf);
+      setMarginContribution(trade.marginContribution?.toString() || '');
     }
   }, [open, trade]);
 
@@ -82,6 +89,8 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
       target: target ? parseFloat(target) : null,
       targetRPT: targetRPT ? parseFloat(targetRPT) : null,
       notes: notes || null,
+      isMtf,
+      marginContribution: isMtf && marginContribution ? parseFloat(marginContribution) : null,
     });
 
     setOpen(false);
@@ -227,6 +236,27 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
                 className="bg-secondary/50 border-border font-mono"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 items-end">
+            <div className="flex items-center gap-2 pt-6">
+              <Checkbox id="edit-isMtf" checked={isMtf} onCheckedChange={(v) => setIsMtf(!!v)} />
+              <Label htmlFor="edit-isMtf" className="cursor-pointer">MTF (Margin Trade)</Label>
+            </div>
+            {isMtf && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-marginContribution">Margin Contribution (₹)</Label>
+                <Input
+                  id="edit-marginContribution"
+                  type="number"
+                  step="0.01"
+                  placeholder={entryPrice && quantity ? `Default 25% = ${(parseFloat(entryPrice) * parseFloat(quantity) * 0.25).toFixed(0)}` : 'Default 25%'}
+                  value={marginContribution}
+                  onChange={(e) => setMarginContribution(e.target.value)}
+                  className="bg-secondary/50 border-border font-mono"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
