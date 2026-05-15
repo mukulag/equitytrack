@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       exits: {
         Row: {
+          charges: number
           created_at: string
           exit_date: string
           exit_price: number
@@ -25,6 +26,7 @@ export type Database = {
           trade_id: string
         }
         Insert: {
+          charges?: number
           created_at?: string
           exit_date: string
           exit_price: number
@@ -34,6 +36,7 @@ export type Database = {
           trade_id: string
         }
         Update: {
+          charges?: number
           created_at?: string
           exit_date?: string
           exit_price?: number
@@ -109,10 +112,14 @@ export type Database = {
           created_at: string
           current_price: number | null
           current_stop_loss: number | null
+          entry_charges: number
           entry_date: string
           entry_price: number
           entry_time: string | null
+          exit_charges: number
           id: string
+          is_mtf: boolean
+          margin_contribution: number | null
           notes: string | null
           quantity: number
           remaining_quantity: number
@@ -131,10 +138,14 @@ export type Database = {
           created_at?: string
           current_price?: number | null
           current_stop_loss?: number | null
+          entry_charges?: number
           entry_date: string
           entry_price: number
           entry_time?: string | null
+          exit_charges?: number
           id?: string
+          is_mtf?: boolean
+          margin_contribution?: number | null
           notes?: string | null
           quantity: number
           remaining_quantity: number
@@ -153,10 +164,14 @@ export type Database = {
           created_at?: string
           current_price?: number | null
           current_stop_loss?: number | null
+          entry_charges?: number
           entry_date?: string
           entry_price?: number
           entry_time?: string | null
+          exit_charges?: number
           id?: string
+          is_mtf?: boolean
+          margin_contribution?: number | null
           notes?: string | null
           quantity?: number
           remaining_quantity?: number
