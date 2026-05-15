@@ -60,6 +60,8 @@ export const useTrades = () => {
           totalPnl: Number(trade.total_pnl),
           remainingQuantity: Number(trade.remaining_quantity),
           bookedProfit: Number(trade.booked_profit),
+          isMtf: (trade as any).is_mtf ?? false,
+          marginContribution: (trade as any).margin_contribution != null ? Number((trade as any).margin_contribution) : null,
         };
       });
 
@@ -95,7 +97,9 @@ export const useTrades = () => {
         current_price: trade.currentPrice || null,
         notes: trade.notes || null,
         remaining_quantity: trade.quantity,
-      });
+        is_mtf: (trade as any).isMtf ?? false,
+        margin_contribution: (trade as any).marginContribution ?? null,
+      } as any);
 
       if (error) throw error;
       toast.success('Trade added successfully');
@@ -265,6 +269,8 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     target: number | null;
     targetRPT: number | null;
     notes: string | null;
+    isMtf?: boolean;
+    marginContribution?: number | null;
   }) => {
     if (!user) return;
 
@@ -311,7 +317,9 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           booked_profit: newBookedProfit,
           total_pnl: newBookedProfit,
           status: newStatus,
-        })
+          ...(updates.isMtf !== undefined ? { is_mtf: updates.isMtf } : {}),
+          ...(updates.marginContribution !== undefined ? { margin_contribution: updates.marginContribution } : {}),
+        } as any)
         .eq('id', tradeId);
 
       if (error) throw error;
