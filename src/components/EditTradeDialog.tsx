@@ -238,6 +238,27 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4 items-end">
+            <div className="flex items-center gap-2 pt-6">
+              <Checkbox id="edit-isMtf" checked={isMtf} onCheckedChange={(v) => setIsMtf(!!v)} />
+              <Label htmlFor="edit-isMtf" className="cursor-pointer">MTF (Margin Trade)</Label>
+            </div>
+            {isMtf && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-marginContribution">Margin Contribution (₹)</Label>
+                <Input
+                  id="edit-marginContribution"
+                  type="number"
+                  step="0.01"
+                  placeholder={entryPrice && quantity ? `Default 25% = ${(parseFloat(entryPrice) * parseFloat(quantity) * 0.25).toFixed(0)}` : 'Default 25%'}
+                  value={marginContribution}
+                  onChange={(e) => setMarginContribution(e.target.value)}
+                  className="bg-secondary/50 border-border font-mono"
+                />
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="edit-notes">Notes</Label>
             <Textarea
