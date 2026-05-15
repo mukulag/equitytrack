@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Trade, TradeType } from '@/types/trade';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface EditTradeDialogProps {
   trade: Trade;
@@ -34,6 +35,8 @@ interface EditTradeDialogProps {
     target: number | null;
     targetRPT: number | null;
     notes: string | null;
+    isMtf?: boolean;
+    marginContribution?: number | null;
   }) => void;
 }
 
@@ -50,6 +53,8 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
   const [target, setTarget] = useState(trade.target?.toString() || '');
   const [targetRPT, setTargetRPT] = useState(trade.targetRPT?.toString() || '2000');
   const [notes, setNotes] = useState(trade.notes || '');
+  const [isMtf, setIsMtf] = useState(!!trade.isMtf);
+  const [marginContribution, setMarginContribution] = useState(trade.marginContribution?.toString() || '');
 
   useEffect(() => {
     if (open) {
@@ -64,6 +69,8 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
       setTarget(trade.target?.toString() || '');
       setTargetRPT(trade.targetRPT?.toString() || '2000');
       setNotes(trade.notes || '');
+      setIsMtf(!!trade.isMtf);
+      setMarginContribution(trade.marginContribution?.toString() || '');
     }
   }, [open, trade]);
 
@@ -82,6 +89,8 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
       target: target ? parseFloat(target) : null,
       targetRPT: targetRPT ? parseFloat(targetRPT) : null,
       notes: notes || null,
+      isMtf,
+      marginContribution: isMtf && marginContribution ? parseFloat(marginContribution) : null,
     });
 
     setOpen(false);
