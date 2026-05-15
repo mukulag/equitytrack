@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { TradeType } from '@/types/trade';
 import { supabase } from '@/integrations/supabase/client';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface AddTradeDialogProps {
   onAddTrade: (trade: {
@@ -34,6 +35,8 @@ interface AddTradeDialogProps {
     target: number | null;
     targetRPT: number;
     notes: string;
+    isMtf?: boolean;
+    marginContribution?: number | null;
   }) => void;
 }
 
@@ -49,6 +52,8 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
   const [currentStopLoss, setCurrentStopLoss] = useState('');
   const [targetRPT, setTargetRPT] = useState('2000');
   const [notes, setNotes] = useState('');
+  const [isMtf, setIsMtf] = useState(false);
+  const [marginContribution, setMarginContribution] = useState('');
   const [cmp, setCmp] = useState<number | null>(null);
   const [dailyLow, setDailyLow] = useState<number | null>(null);
   const [isFetchingCmp, setIsFetchingCmp] = useState(false);
@@ -148,6 +153,8 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
       target: null,
       targetRPT: parseFloat(targetRPT) || 2000,
       notes,
+      isMtf,
+      marginContribution: isMtf && marginContribution ? parseFloat(marginContribution) : null,
     });
 
     setSymbol('');
@@ -161,6 +168,8 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
     setNotes('');
     setCmp(null);
     setDailyLow(null);
+    setIsMtf(false);
+    setMarginContribution('');
     setOpen(false);
   };
 
@@ -334,6 +343,27 @@ export const AddTradeDialog = ({ onAddTrade }: AddTradeDialogProps) => {
                 className="bg-secondary/50 border-border font-mono"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 items-end">
+            <div className="flex items-center gap-2 pt-6">
+              <Checkbox id="isMtf" checked={isMtf} onCheckedChange={(v) => setIsMtf(!!v)} />
+              <Label htmlFor="isMtf" className="cursor-pointer">MTF (Margin Trade)</Label>
+            </div>
+            {isMtf && (
+              <div className="space-y-2">
+                <Label htmlFor="marginContribution">Margin Contribution (₹)</Label>
+                <Input
+                  id="marginContribution"
+                  type="number"
+                  step="0.01"
+                  placeholder={entryPrice && quantity ? `Default 25% = ${(parseFloat(entryPrice) * parseFloat(quantity) * 0.25).toFixed(0)}` : 'Default 25%'}
+                  value={marginContribution}
+                  onChange={(e) => setMarginContribution(e.target.value)}
+                  className="bg-secondary/50 border-border font-mono"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
