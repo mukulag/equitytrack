@@ -69,9 +69,6 @@ export const TradeCards = ({ trades }: { trades: Trade[] }) => {
               <strong>Net %:</strong> {m.netMarginPercent > 0 ? '+' : ''}{m.netMarginPercent.toFixed(2)}%
             </div>
 
-            <div className="truncate"><strong>Setup SL:</strong> {t.setupStopLoss ? formatCurrency(t.setupStopLoss) : '—'}</div>
-            <div className="truncate"><strong>Current SL:</strong> {t.currentStopLoss ? formatCurrency(t.currentStopLoss) : '—'}</div>
-
             <div className="truncate"><strong>Opened:</strong> {format(new Date(t.entryDate), 'dd MMM yyyy')}</div>
             <div className="truncate"><strong>Type:</strong> {t.tradeType}</div>
           </div>

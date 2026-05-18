@@ -17,10 +17,6 @@ export interface Trade {
   entryPrice: number;
   quantity: number;
   currentPrice: number | null;
-  setupStopLoss: number | null;
-  currentStopLoss: number | null;
-  target: number | null;
-  targetRPT: number;
   notes: string;
   exits: Exit[];
   status: TradeStatus;

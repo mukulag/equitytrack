@@ -30,10 +30,6 @@ interface EditTradeDialogProps {
     entryPrice: number;
     quantity: number;
     currentPrice: number | null;
-    setupStopLoss: number | null;
-    currentStopLoss: number | null;
-    target: number | null;
-    targetRPT: number | null;
     notes: string | null;
     isMtf?: boolean;
     marginContribution?: number | null;
@@ -48,10 +44,6 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
   const [entryPrice, setEntryPrice] = useState(trade.entryPrice.toString());
   const [quantity, setQuantity] = useState(trade.quantity.toString());
   const [currentPrice, setCurrentPrice] = useState(trade.currentPrice?.toString() || '');
-  const [setupStopLoss, setSetupStopLoss] = useState(trade.setupStopLoss?.toString() || '');
-  const [currentStopLoss, setCurrentStopLoss] = useState(trade.currentStopLoss?.toString() || '');
-  const [target, setTarget] = useState(trade.target?.toString() || '');
-  const [targetRPT, setTargetRPT] = useState(trade.targetRPT?.toString() || '2000');
   const [notes, setNotes] = useState(trade.notes || '');
   const [isMtf, setIsMtf] = useState(!!trade.isMtf);
   const [marginContribution, setMarginContribution] = useState(trade.marginContribution?.toString() || '');
@@ -64,10 +56,6 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
       setEntryPrice(trade.entryPrice.toString());
       setQuantity(trade.quantity.toString());
       setCurrentPrice(trade.currentPrice?.toString() || '');
-      setSetupStopLoss(trade.setupStopLoss?.toString() || '');
-      setCurrentStopLoss(trade.currentStopLoss?.toString() || '');
-      setTarget(trade.target?.toString() || '');
-      setTargetRPT(trade.targetRPT?.toString() || '2000');
       setNotes(trade.notes || '');
       setIsMtf(!!trade.isMtf);
       setMarginContribution(trade.marginContribution?.toString() || '');
@@ -84,10 +72,6 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
       entryPrice: parseFloat(entryPrice),
       quantity: parseInt(quantity),
       currentPrice: currentPrice ? parseFloat(currentPrice) : null,
-      setupStopLoss: setupStopLoss ? parseFloat(setupStopLoss) : null,
-      currentStopLoss: currentStopLoss ? parseFloat(currentStopLoss) : null,
-      target: target ? parseFloat(target) : null,
-      targetRPT: targetRPT ? parseFloat(targetRPT) : null,
       notes: notes || null,
       isMtf,
       marginContribution: isMtf && marginContribution ? parseFloat(marginContribution) : null,
@@ -173,69 +157,17 @@ export const EditTradeDialog = ({ trade, onEditTrade }: EditTradeDialogProps) =>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-quantity">Quantity</Label>
-              <Input
-                id="edit-quantity"
-                type="number"
-                placeholder="0"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                required
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-setupStopLoss">Setup SL</Label>
-              <Input
-                id="edit-setupStopLoss"
-                type="number"
-                step="0.01"
-                placeholder="Original SL"
-                value={setupStopLoss}
-                onChange={(e) => setSetupStopLoss(e.target.value)}
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-currentStopLoss">Current SL</Label>
-              <Input
-                id="edit-currentStopLoss"
-                type="number"
-                step="0.01"
-                placeholder="Trailing SL"
-                value={currentStopLoss}
-                onChange={(e) => setCurrentStopLoss(e.target.value)}
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-target">Target Price</Label>
-              <Input
-                id="edit-target"
-                type="number"
-                step="0.01"
-                placeholder="Target"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-targetRPT">Target RPT (₹)</Label>
-              <Input
-                id="edit-targetRPT"
-                type="number"
-                placeholder="2000"
-                value={targetRPT}
-                onChange={(e) => setTargetRPT(e.target.value)}
-                className="bg-secondary/50 border-border font-mono"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-quantity">Quantity</Label>
+            <Input
+              id="edit-quantity"
+              type="number"
+              placeholder="0"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              required
+              className="bg-secondary/50 border-border font-mono"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4 items-end">

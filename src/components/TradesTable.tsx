@@ -9,7 +9,6 @@ interface TradesTableProps {
   onDeleteTrade: (tradeId: string) => void;
   onDeleteExit: (tradeId: string, exitId: string) => void;
   onUpdateCurrentPrice: (tradeId: string, currentPrice: number | null) => void;
-  onUpdateCurrentSL: (tradeId: string, currentSL: number | null) => void;
   onEditTrade: (tradeId: string, updates: {
     symbol: string;
     tradeType: TradeType;
@@ -17,10 +16,6 @@ interface TradesTableProps {
     entryPrice: number;
     quantity: number;
     currentPrice: number | null;
-    setupStopLoss: number | null;
-    currentStopLoss: number | null;
-    target: number | null;
-    targetRPT: number | null;
     notes: string | null;
   }) => void;
   onEditExit: (tradeId: string, exitId: string, updates: {
@@ -30,7 +25,21 @@ interface TradesTableProps {
   }) => void;
 }
 
-export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onUpdateCurrentSL, onEditTrade, onEditExit }: TradesTableProps) => {
+export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onEditTrade, onEditExit }: TradesTableProps) => {
+  const [mobileView, setMobileView] = useState<'table' | 'cards'>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('tradesMobileView');
+      return v === 'cards' ? 'cards' : 'table';
+    }
+    return 'table';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tradesMobileView', mobileView);
+    }
+  }, [mobileView]);
+
   if (trades.length === 0) {
     return (
       <div className="glass-card rounded-xl p-12 text-center animate-fade-in">
@@ -41,21 +50,6 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
       </div>
     );
   }
-
-  const [mobileView, setMobileView] = useState<'table' | 'cards'>(() => {
-    if (typeof window !== 'undefined') {
-      const v = localStorage.getItem('tradesMobileView');
-      return v === 'cards' ? 'cards' : 'table';
-    }
-    return 'table';
-  });
-
-  // Persist preference locally
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('tradesMobileView', mobileView);
-    }
-  }, [mobileView]);
 
   return (
     <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
@@ -76,7 +70,7 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
       </div>
 
       {/* Cards view (mobile only) */}
-      <div className={`${mobileView === 'cards' ? 'block' : 'hidden'} md:hidden`}> 
+      <div className={`${mobileView === 'cards' ? 'block' : 'hidden'} md:hidden`}>
         <TradeCards trades={trades} />
       </div>
 
@@ -91,8 +85,6 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground md:sticky md:left-[220px] md:z-10 bg-secondary/30 min-w-[100px]">Entry</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground md:sticky md:left-[320px] md:z-10 bg-secondary/30 min-w-[100px]">CMP</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Qty</th>
-                <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Setup SL</th>
-                <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Current SL</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Status</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Booked</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Unrealized</th>
@@ -112,7 +104,6 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
                   onDeleteTrade={onDeleteTrade}
                   onDeleteExit={onDeleteExit}
                   onUpdateCurrentPrice={onUpdateCurrentPrice}
-                  onUpdateCurrentSL={onUpdateCurrentSL}
                   onEditTrade={onEditTrade}
                   onEditExit={onEditExit}
                 />
