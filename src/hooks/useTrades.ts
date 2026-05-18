@@ -408,7 +408,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
       winRate,
       unrealizedPnl,
       totalExposure,
-      totalRisk,
+      
     };
   };
 
@@ -846,7 +846,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     deleteTrade,
     deleteExit,
     updateCurrentPrice,
-    updateCurrentSL,
+    
     editTrade,
     editExit,
     getStats,
