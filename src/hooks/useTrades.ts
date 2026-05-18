@@ -49,10 +49,6 @@ export const useTrades = () => {
           entryTime: trade.entry_time || undefined,
           entryPrice: Number(trade.entry_price),
           quantity: Number(trade.quantity),
-          setupStopLoss: trade.setup_stop_loss ? Number(trade.setup_stop_loss) : undefined,
-          currentStopLoss: trade.current_stop_loss ? Number(trade.current_stop_loss) : undefined,
-          target: trade.target ? Number(trade.target) : undefined,
-          targetRPT: trade.target_rpt ? Number(trade.target_rpt) : undefined,
           currentPrice: trade.current_price ? Number(trade.current_price) : undefined,
           notes: trade.notes || undefined,
           exits: tradeExits,
@@ -90,10 +86,6 @@ export const useTrades = () => {
         entry_time: null,
         entry_price: trade.entryPrice,
         quantity: trade.quantity,
-        setup_stop_loss: trade.setupStopLoss || null,
-        current_stop_loss: trade.currentStopLoss || null,
-        target: trade.target || null,
-        target_rpt: trade.targetRPT || null,
         current_price: trade.currentPrice || null,
         notes: trade.notes || null,
         remaining_quantity: trade.quantity,
@@ -240,22 +232,6 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     }
   };
 
-  const updateCurrentSL = async (tradeId: string, currentStopLoss: number | null) => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from('trades')
-        .update({ current_stop_loss: currentStopLoss })
-        .eq('id', tradeId);
-
-      if (error) throw error;
-      fetchTrades();
-    } catch (error: any) {
-      toast.error('Failed to update stop loss');
-      console.error('Update SL error:', error);
-    }
-  };
 
   const editTrade = async (tradeId: string, updates: {
     symbol: string;
@@ -264,10 +240,6 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     entryPrice: number;
     quantity: number;
     currentPrice: number | null;
-    setupStopLoss: number | null;
-    currentStopLoss: number | null;
-    target: number | null;
-    targetRPT: number | null;
     notes: string | null;
     isMtf?: boolean;
     marginContribution?: number | null;
@@ -308,10 +280,6 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           entry_price: updates.entryPrice,
           quantity: updates.quantity,
           current_price: updates.currentPrice,
-          setup_stop_loss: updates.setupStopLoss,
-          current_stop_loss: updates.currentStopLoss,
-          target: updates.target,
-          target_rpt: updates.targetRPT,
           notes: updates.notes,
           remaining_quantity: newRemainingQty,
           booked_profit: newBookedProfit,
@@ -429,21 +397,6 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     const totalExposure = trades
       .filter((t) => t.status !== 'CLOSED')
       .reduce((sum, t) => sum + t.entryPrice * t.remainingQuantity, 0);
-
-    const totalRisk = trades
-      .filter((t) => t.status !== 'CLOSED')
-      .reduce((sum, t) => {
-        const sl = t.currentStopLoss; // Use current SL only
-        // If there's a current SL defined, compute risk; otherwise treat as risk-free (0)
-        if (sl !== undefined && sl !== null) {
-          const risk = t.tradeType === 'LONG'
-            ? (t.entryPrice - sl) * t.remainingQuantity
-            : (sl - t.entryPrice) * t.remainingQuantity;
-          // Allow negative risk values (do not clamp to 0)
-          return sum + risk;
-        }
-        return sum;
-      }, 0);
 
     return {
       totalTrades,
