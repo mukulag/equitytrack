@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { KiteImportDialog, ParsedCSVTrade } from '@/components/KiteImportDialog';
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, editTrade, editExit, getStats, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
   const { signOut, user } = useAuth();
   const stats = getStats();
 
@@ -257,7 +257,7 @@ const Index = () => {
             onDeleteTrade={deleteTrade}
             onDeleteExit={deleteExit}
             onUpdateCurrentPrice={updateCurrentPrice}
-            onUpdateCurrentSL={updateCurrentSL}
+            
             onEditTrade={editTrade}
             onEditExit={editExit}
           />
