@@ -446,8 +446,6 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           quantity: holding.quantity,
           remaining_quantity: holding.quantity,
           current_price: holding.last_price,
-          setup_stop_loss: holding.prev_day_low || null,
-          current_stop_loss: holding.prev_day_low || null,
           notes: `Imported from Kite Holdings - ISIN: ${holding.isin || 'N/A'}`,
           is_mtf: holding.product === 'MTF',
         } as any);
@@ -626,56 +624,6 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     let imported = 0;
     let skipped = 0;
     
-    // Group trades by entry date to batch fetch daily lows
-    const tradesByDate = new Map<string, typeof trades>();
-    for (const trade of trades) {
-      const dateKey = trade.entryDate;
-      if (!tradesByDate.has(dateKey)) {
-        tradesByDate.set(dateKey, []);
-      }
-      tradesByDate.get(dateKey)!.push(trade);
-    }
-
-    // Fetch daily lows for each date
-    const dailyLowsMap = new Map<string, number | null>(); // key: symbol_date
-
-    console.log('Fetching daily lows for trades grouped by date:', Array.from(tradesByDate.keys()));
-
-    for (const [entryDate, dateTrades] of tradesByDate) {
-      const symbolsForDate = [...new Set(dateTrades.map(t => t.symbol))];
-      
-      try {
-        const { data: dailyData, error: dailyError } = await supabase.functions.invoke('fetch-stock-price', {
-          body: { symbols: symbolsForDate, date: entryDate },
-        });
-
-        if (dailyError) {
-          console.error(`Error fetching daily lows for ${entryDate}:`, dailyError);
-        } else if (dailyData?.quotes && Array.isArray(dailyData.quotes)) {
-          console.log(`Received quotes for ${entryDate}:`, dailyData.quotes);
-          dailyData.quotes.forEach((quote: any) => {
-            let low = quote.low;
-            if (low === null || low === undefined) {
-              if (quote.lows && Array.isArray(quote.lows) && quote.lows.length > 0) {
-                const filteredLows = quote.lows.filter((v: number) => v !== null && v !== undefined);
-                if (filteredLows.length > 0) {
-                  low = Math.min(...filteredLows);
-                }
-              }
-            }
-            const key = `${quote.symbol}_${entryDate}`;
-            console.log(`Setting daily low for ${key}:`, low);
-            dailyLowsMap.set(key, low !== undefined ? low : null);
-          });
-        } else {
-          console.warn(`No valid quotes data received for ${entryDate}:`, dailyData);
-        }
-      } catch (error) {
-        console.error(`Failed to fetch daily lows for ${entryDate}:`, error);
-      }
-    }
-
-    console.log('Daily lows map:', Array.from(dailyLowsMap.entries()));
 
     console.log('Starting CSV import. Total trades to import:', trades.length);
     console.log('IPO trades to import:', trades.filter(t => t.tradeType === 'IPO').length);
@@ -758,12 +706,6 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           }
         }
 
-        // Get daily low for this symbol on the entry date
-        const lowKey = `${finalTrade.symbol}_${finalTrade.entryDate}`;
-        let setupSL = dailyLowsMap.get(lowKey);
-        if (setupSL === undefined) setupSL = null;
-        console.log(`Inserting trade ${finalTrade.symbol} (${finalTrade.entryDate}) with setup SL:`, setupSL);
-
         const { data: insertedTrade, error: insertError } = await supabase.from('trades').insert({
           user_id: user.id,
           symbol: finalTrade.symbol,
@@ -775,26 +717,11 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           booked_profit: bookedProfit,
           total_pnl: totalPnl,
           status: status,
-          setup_stop_loss: setupSL,
           notes: finalTrade.notes || 'Imported from CSV',
         }).select('id');
 
         if (insertError) {
           console.error('Insert error for trade:', finalTrade.symbol, insertError);
-          console.error('Trade data being inserted:', {
-            user_id: user.id,
-            symbol: finalTrade.symbol,
-            trade_type: finalTrade.tradeType,
-            entry_date: finalTrade.entryDate,
-            entry_price: finalTrade.entryPrice,
-            quantity: finalTrade.quantity,
-            remaining_quantity: remainingQty,
-            booked_profit: bookedProfit,
-            total_pnl: totalPnl,
-            status: status,
-            setup_stop_loss: setupSL,
-            notes: finalTrade.notes || 'Imported from CSV',
-          });
           throw insertError;
         }
         if (!insertedTrade || insertedTrade.length === 0) throw new Error('Failed to insert trade');

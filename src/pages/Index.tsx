@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut, Download } from 'lucide-react';
+import { TrendingUp, Activity, Target, PieChart, Wallet, BarChart3, LogOut, Download } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import React, { useState, useCallback } from 'react';
 import { useTrades } from '@/hooks/useTrades';
