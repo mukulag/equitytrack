@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Activity, Target, PieChart, Wallet, AlertTriangle, BarChart3, LogOut, Download } from 'lucide-react';
+import { TrendingUp, Activity, Target, PieChart, Wallet, BarChart3, LogOut, Download } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import React, { useState, useCallback } from 'react';
 import { useTrades } from '@/hooks/useTrades';
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { KiteImportDialog, ParsedCSVTrade } from '@/components/KiteImportDialog';
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, updateCurrentSL, editTrade, editExit, getStats, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, editTrade, editExit, getStats, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
   const { signOut, user } = useAuth();
   const stats = getStats();
 
@@ -209,17 +209,11 @@ const Index = () => {
         ) : (
           <>
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 auto-rows-fr">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 auto-rows-fr">
           <StatsCard
             title="Total Exposure"
             value={formatCurrency(stats.totalExposure)}
             icon={BarChart3}
-          />
-          <StatsCard
-            title="Total Risk"
-            value={formatCurrency(stats.totalRisk)}
-            icon={AlertTriangle}
-            trend={stats.totalRisk > 0 ? 'down' : stats.totalRisk < 0 ? 'up' : 'neutral'}
           />
           <StatsCard
             title="Unrealized P&L"
@@ -257,7 +251,7 @@ const Index = () => {
             onDeleteTrade={deleteTrade}
             onDeleteExit={deleteExit}
             onUpdateCurrentPrice={updateCurrentPrice}
-            onUpdateCurrentSL={updateCurrentSL}
+            
             onEditTrade={editTrade}
             onEditExit={editExit}
           />

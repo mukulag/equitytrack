@@ -28,7 +28,6 @@ interface TradeRowProps {
   onDeleteTrade: (tradeId: string) => void;
   onDeleteExit: (tradeId: string, exitId: string) => void;
   onUpdateCurrentPrice: (tradeId: string, currentPrice: number | null) => void;
-  onUpdateCurrentSL: (tradeId: string, currentSL: number | null) => void;
   onEditTrade: (tradeId: string, updates: {
     symbol: string;
     tradeType: TradeType;
@@ -36,10 +35,6 @@ interface TradeRowProps {
     entryPrice: number;
     quantity: number;
     currentPrice: number | null;
-    setupStopLoss: number | null;
-    currentStopLoss: number | null;
-    target: number | null;
-    targetRPT: number | null;
     notes: string | null;
   }) => void;
   onEditExit: (tradeId: string, exitId: string, updates: {
@@ -49,12 +44,10 @@ interface TradeRowProps {
   }) => void;
 }
 
-export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onUpdateCurrentSL, onEditTrade, onEditExit }: TradeRowProps) => {
+export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onEditTrade, onEditExit }: TradeRowProps) => {
   const [expanded, setExpanded] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
-  const [editingSL, setEditingSL] = useState(false);
   const [tempPrice, setTempPrice] = useState(trade.currentPrice?.toString() || '');
-  const [tempSL, setTempSL] = useState(trade.currentStopLoss?.toString() || '');
 
   const statusColors = {
     OPEN: 'bg-primary/20 text-primary border-primary/30',
@@ -70,23 +63,12 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
     }).format(value);
   };
 
-  // Calculate derived values
-  const activeStopLoss = trade.currentStopLoss ?? trade.setupStopLoss;
-  const slDistance = activeStopLoss ? (trade.entryPrice - activeStopLoss) : null;
-  const slPercent = activeStopLoss ? ((activeStopLoss - trade.entryPrice) / trade.entryPrice * 100) : null;
-  const currentRPT = slDistance && trade.remainingQuantity ? slDistance * trade.remainingQuantity : null;
   const metrics = computeTradeMetrics(trade);
   const unrealizedPnl = metrics.unrealizedPnl;
-  const positionSize = trade.entryPrice * trade.quantity;
 
   const handlePriceSave = () => {
     onUpdateCurrentPrice(trade.id, tempPrice ? parseFloat(tempPrice) : null);
     setEditingPrice(false);
-  };
-
-  const handleSLSave = () => {
-    onUpdateCurrentSL(trade.id, tempSL ? parseFloat(tempSL) : null);
-    setEditingSL(false);
   };
 
   return (
@@ -110,7 +92,6 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
               <span className="font-mono font-semibold text-primary">{trade.symbol}</span>
             </button>
 
-            {/* Chevron separator to indicate sticky column boundary */}
             <span className="hidden md:flex absolute right-[-8px] top-1/2 -translate-y-1/2 items-center justify-center h-6 w-6 bg-gradient-to-r from-transparent to-secondary/30 rounded-l pl-1 pointer-events-none">
               <ChevronRight className="h-3 w-3 opacity-60" />
             </span>
@@ -146,31 +127,6 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           )}
         </td>
         <td className="p-4 font-mono text-sm">{trade.remainingQuantity}/{trade.quantity}</td>
-        <td className="p-4 font-mono text-sm text-muted-foreground">
-          {trade.setupStopLoss ? formatCurrency(trade.setupStopLoss) : '—'}
-        </td>
-        <td className="p-4">
-          {editingSL ? (
-            <Input
-              type="number"
-              step="0.01"
-              value={tempSL}
-              onChange={(e) => setTempSL(e.target.value)}
-              onBlur={handleSLSave}
-              onKeyDown={(e) => e.key === 'Enter' && handleSLSave()}
-              className="w-24 h-7 font-mono text-sm bg-secondary/50"
-              autoFocus
-            />
-          ) : (
-            <button
-              onClick={() => { setTempSL(trade.currentStopLoss?.toString() || ''); setEditingSL(true); }}
-              className="font-mono text-sm text-muted-foreground flex items-center gap-1 hover:text-primary transition-colors"
-            >
-              {trade.currentStopLoss ? formatCurrency(trade.currentStopLoss) : '—'}
-              <Edit2 className="h-3 w-3 opacity-50" />
-            </button>
-          )}
-        </td>
         <td className="p-4">
           <Badge variant="outline" className={cn('text-xs', statusColors[trade.status])}>
             {trade.status}
@@ -232,9 +188,9 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
         </td>
         <td className="p-4">
           <div className="flex items-center gap-1">
-            <Badge variant="outline" className={cn('text-xs', 
-              trade.tradeType === 'LONG' ? 'border-success/50 text-success' : 
-              trade.tradeType === 'SHORT' ? 'border-destructive/50 text-destructive' : 
+            <Badge variant="outline" className={cn('text-xs',
+              trade.tradeType === 'LONG' ? 'border-success/50 text-success' :
+              trade.tradeType === 'SHORT' ? 'border-destructive/50 text-destructive' :
               'border-primary/50 text-primary')}>
               {trade.tradeType}
             </Badge>
@@ -286,7 +242,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             <td className="p-4 font-mono text-sm md:sticky md:left-[220px] md:z-10 bg-accent/20 min-w-[100px]">{formatCurrency(exit.exitPrice)}</td>
             <td className="p-4 md:sticky md:left-[320px] md:z-10 bg-accent/20 min-w-[100px]"></td>
             <td className="p-4 font-mono text-sm">{exit.quantity}</td>
-            <td className="p-4" colSpan={3}></td>
+            <td className="p-4"></td>
             <td className="p-4">
               <span
                 className={cn(
