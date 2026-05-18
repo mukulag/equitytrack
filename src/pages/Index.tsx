@@ -209,17 +209,11 @@ const Index = () => {
         ) : (
           <>
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 auto-rows-fr">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 auto-rows-fr">
           <StatsCard
             title="Total Exposure"
             value={formatCurrency(stats.totalExposure)}
             icon={BarChart3}
-          />
-          <StatsCard
-            title="Total Risk"
-            value={formatCurrency(stats.totalRisk)}
-            icon={AlertTriangle}
-            trend={stats.totalRisk > 0 ? 'down' : stats.totalRisk < 0 ? 'up' : 'neutral'}
           />
           <StatsCard
             title="Unrealized P&L"
