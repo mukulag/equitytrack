@@ -516,65 +516,143 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
   };
 
   const importKiteOrders = async (orders: any[]) => {
-    if (!user) return { imported: 0, skipped: 0 };
+    if (!user) return { imported: 0, skipped: 0, exitsAdded: 0 };
 
     let imported = 0;
     let skipped = 0;
+    let exitsAdded = 0;
 
-    // Group orders by symbol to calculate net position
-    for (const order of orders) {
-      // Only import completed orders
-      if (order.status !== 'COMPLETE') {
-        skipped++;
-        continue;
-      }
+    // Process oldest orders first so BUYs land before matching SELLs
+    const completed = orders
+      .filter((o) => o.status === 'COMPLETE')
+      .sort((a, b) => (a.order_timestamp || '').localeCompare(b.order_timestamp || ''));
+    skipped += orders.length - completed.length;
 
+    for (const order of completed) {
       try {
-        // Check if trade already exists with same symbol, price and date
         const orderDate = order.order_timestamp?.split(' ')[0] || new Date().toISOString().split('T')[0];
-        
-        const { data: existing } = await supabase
-          .from('trades')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('symbol', order.tradingsymbol)
-          .eq('entry_price', order.average_price)
-          .eq('entry_date', orderDate)
-          .limit(1);
+        const symbol = order.tradingsymbol;
+        const qty = Number(order.filled_quantity || order.quantity || 0);
+        const price = Number(order.average_price || 0);
+        if (!qty || !price) { skipped++; continue; }
 
-        if (existing && existing.length > 0) {
-          skipped++;
-          continue;
+        if (order.transaction_type === 'BUY') {
+          // Duplicate guard for entries
+          const { data: existing } = await supabase
+            .from('trades')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('symbol', symbol)
+            .eq('entry_price', price)
+            .eq('entry_date', orderDate)
+            .limit(1);
+
+          if (existing && existing.length > 0) { skipped++; continue; }
+
+          const { error } = await supabase.from('trades').insert({
+            user_id: user.id,
+            symbol,
+            trade_type: 'LONG',
+            entry_date: orderDate,
+            entry_price: price,
+            quantity: qty,
+            remaining_quantity: qty,
+            current_price: price,
+            is_mtf: (order.product === 'MTF'),
+            notes: `Imported from Kite - Order ID: ${order.order_id}`,
+          });
+          if (error) throw error;
+          imported++;
+        } else if (order.transaction_type === 'SELL') {
+          // Match SELL as an exit against open LONG trades (FIFO by entry_date)
+          const { data: openTrades, error: fetchErr } = await supabase
+            .from('trades')
+            .select('id, entry_date, entry_price, trade_type, quantity, remaining_quantity, booked_profit, total_pnl')
+            .eq('user_id', user.id)
+            .eq('symbol', symbol)
+            .eq('trade_type', 'LONG')
+            .in('status', ['OPEN', 'PARTIAL'])
+            .gt('remaining_quantity', 0)
+            .order('entry_date', { ascending: true });
+
+          if (fetchErr) throw fetchErr;
+          if (!openTrades || openTrades.length === 0) {
+            console.warn(`SELL for ${symbol} but no open LONG trade — skipping`, order);
+            skipped++;
+            continue;
+          }
+
+          // Duplicate-exit guard: same trade + date + price + qty already exists?
+          let remainingToExit = qty;
+          for (const t of openTrades) {
+            if (remainingToExit <= 0) break;
+            const take = Math.min(Number(t.remaining_quantity), remainingToExit);
+
+            const { data: dupExit } = await supabase
+              .from('exits')
+              .select('id')
+              .eq('trade_id', t.id)
+              .eq('exit_date', orderDate)
+              .eq('exit_price', price)
+              .eq('quantity', take)
+              .limit(1);
+            if (dupExit && dupExit.length > 0) {
+              remainingToExit -= take;
+              continue;
+            }
+
+            const pnl = (price - Number(t.entry_price)) * take;
+            const { error: exitErr } = await supabase.from('exits').insert({
+              trade_id: t.id,
+              exit_date: orderDate,
+              exit_price: price,
+              quantity: take,
+              pnl,
+            });
+            if (exitErr) throw exitErr;
+
+            const newRemaining = Number(t.remaining_quantity) - take;
+            const newBooked = Number(t.booked_profit) + pnl;
+            const newTotal = Number(t.total_pnl) + pnl;
+            const newStatus = newRemaining === 0 ? 'CLOSED'
+              : (Number(t.quantity) - newRemaining > 0 ? 'PARTIAL' : 'OPEN');
+
+            const { error: updErr } = await supabase
+              .from('trades')
+              .update({
+                remaining_quantity: newRemaining,
+                booked_profit: newBooked,
+                total_pnl: newTotal,
+                status: newStatus,
+              })
+              .eq('id', t.id);
+            if (updErr) throw updErr;
+
+            exitsAdded++;
+            remainingToExit -= take;
+          }
+
+          if (remainingToExit > 0) {
+            console.warn(`SELL ${symbol} qty ${qty}: ${remainingToExit} unmatched (no open qty left)`);
+          }
         }
-
-        const isBuy = order.transaction_type === 'BUY';
-
-        const { error } = await supabase.from('trades').insert({
-          user_id: user.id,
-          symbol: order.tradingsymbol,
-          trade_type: isBuy ? 'LONG' : 'SHORT',
-          entry_date: orderDate,
-          entry_price: order.average_price,
-          quantity: order.filled_quantity || order.quantity,
-          remaining_quantity: order.filled_quantity || order.quantity,
-          current_price: order.average_price,
-          notes: `Imported from Kite - Order ID: ${order.order_id}`,
-        });
-
-        if (error) throw error;
-        imported++;
       } catch (error) {
         console.error('Failed to import order:', order, error);
         skipped++;
       }
     }
 
-    if (imported > 0) {
-      toast.success(`Imported ${imported} orders from Kite`);
+    if (imported > 0 || exitsAdded > 0) {
+      const parts: string[] = [];
+      if (imported > 0) parts.push(`${imported} new trades`);
+      if (exitsAdded > 0) parts.push(`${exitsAdded} exits`);
+      toast.success(`Imported ${parts.join(' and ')} from Kite`);
       fetchTrades();
+    } else if (skipped > 0) {
+      toast.info('No new orders to import');
     }
 
-    return { imported, skipped };
+    return { imported, skipped, exitsAdded };
   };
 
   const importCSVTrades = async (trades: Array<{
