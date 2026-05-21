@@ -34,11 +34,37 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
     return 'table';
   });
 
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'MANUAL' | 'IPO'>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('tradesTypeFilter');
+      if (v === 'MANUAL' || v === 'IPO') return v;
+    }
+    return 'ALL';
+  });
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('tradesMobileView', mobileView);
     }
   }, [mobileView]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tradesTypeFilter', typeFilter);
+    }
+  }, [typeFilter]);
+
+  const counts = {
+    ALL: trades.length,
+    MANUAL: trades.filter((t) => t.tradeType !== 'IPO').length,
+    IPO: trades.filter((t) => t.tradeType === 'IPO').length,
+  };
+
+  const filteredTrades = trades.filter((t) => {
+    if (typeFilter === 'IPO') return t.tradeType === 'IPO';
+    if (typeFilter === 'MANUAL') return t.tradeType !== 'IPO';
+    return true;
+  });
 
   if (trades.length === 0) {
     return (
@@ -51,27 +77,49 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
     );
   }
 
+  const FilterTabs = (
+    <div className="flex items-center gap-2">
+      {(['ALL', 'MANUAL', 'IPO'] as const).map((k) => (
+        <button
+          key={k}
+          onClick={() => setTypeFilter(k)}
+          className={`px-3 py-1 text-xs rounded-md border transition-colors ${
+            typeFilter === k
+              ? 'bg-primary/15 border-primary/40 text-primary'
+              : 'bg-transparent border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {k === 'MANUAL' ? 'Manual' : k === 'IPO' ? 'IPO' : 'All'}{' '}
+          <span className="opacity-60">({counts[k]})</span>
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
-      {/* Mobile-only view toggle */}
-      <div className="flex items-center justify-end gap-2 p-4 md:hidden">
-        <button
-          className={`px-3 py-1 rounded ${mobileView === 'table' ? 'bg-muted text-foreground' : 'bg-transparent'}`}
-          onClick={() => setMobileView('table')}
-        >
-          Table
-        </button>
-        <button
-          className={`px-3 py-1 rounded ${mobileView === 'cards' ? 'bg-muted text-foreground' : 'bg-transparent'}`}
-          onClick={() => setMobileView('cards')}
-        >
-          Cards
-        </button>
+      {/* Filter + mobile toggle bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-4">
+        {FilterTabs}
+        <div className="flex items-center gap-2 md:hidden">
+          <button
+            className={`px-3 py-1 rounded ${mobileView === 'table' ? 'bg-muted text-foreground' : 'bg-transparent'}`}
+            onClick={() => setMobileView('table')}
+          >
+            Table
+          </button>
+          <button
+            className={`px-3 py-1 rounded ${mobileView === 'cards' ? 'bg-muted text-foreground' : 'bg-transparent'}`}
+            onClick={() => setMobileView('cards')}
+          >
+            Cards
+          </button>
+        </div>
       </div>
 
       {/* Cards view (mobile only) */}
       <div className={`${mobileView === 'cards' ? 'block' : 'hidden'} md:hidden`}>
-        <TradeCards trades={trades} />
+        <TradeCards trades={filteredTrades} />
       </div>
 
       {/* Table view */}
@@ -91,12 +139,13 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Charges</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Net P&L</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Net %</th>
+                <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Source</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Type</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {trades.map((trade) => (
+              {filteredTrades.map((trade) => (
                 <TradeRow
                   key={trade.id}
                   trade={trade}

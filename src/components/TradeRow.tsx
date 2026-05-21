@@ -187,6 +187,13 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </span>
         </td>
         <td className="p-4">
+          {trade.tradeType === 'IPO' ? (
+            <Badge variant="outline" className="text-xs border-primary/50 text-primary bg-primary/10">IPO</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs border-muted-foreground/40 text-muted-foreground">Manual</Badge>
+          )}
+        </td>
+        <td className="p-4">
           <div className="flex items-center gap-1">
             <Badge variant="outline" className={cn('text-xs',
               trade.tradeType === 'LONG' ? 'border-success/50 text-success' :
@@ -255,7 +262,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
                 {formatCurrency(exit.pnl)}
               </span>
             </td>
-            <td colSpan={5}></td>
+            <td colSpan={6}></td>
             <td className="p-4">
               <div className="flex items-center gap-1">
                 <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
