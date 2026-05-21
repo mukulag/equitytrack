@@ -34,11 +34,37 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
     return 'table';
   });
 
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'MANUAL' | 'IPO'>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('tradesTypeFilter');
+      if (v === 'MANUAL' || v === 'IPO') return v;
+    }
+    return 'ALL';
+  });
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('tradesMobileView', mobileView);
     }
   }, [mobileView]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tradesTypeFilter', typeFilter);
+    }
+  }, [typeFilter]);
+
+  const counts = {
+    ALL: trades.length,
+    MANUAL: trades.filter((t) => t.tradeType !== 'IPO').length,
+    IPO: trades.filter((t) => t.tradeType === 'IPO').length,
+  };
+
+  const filteredTrades = trades.filter((t) => {
+    if (typeFilter === 'IPO') return t.tradeType === 'IPO';
+    if (typeFilter === 'MANUAL') return t.tradeType !== 'IPO';
+    return true;
+  });
 
   if (trades.length === 0) {
     return (
@@ -50,6 +76,25 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
       </div>
     );
   }
+
+  const FilterTabs = (
+    <div className="flex items-center gap-2">
+      {(['ALL', 'MANUAL', 'IPO'] as const).map((k) => (
+        <button
+          key={k}
+          onClick={() => setTypeFilter(k)}
+          className={`px-3 py-1 text-xs rounded-md border transition-colors ${
+            typeFilter === k
+              ? 'bg-primary/15 border-primary/40 text-primary'
+              : 'bg-transparent border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {k === 'MANUAL' ? 'Manual' : k === 'IPO' ? 'IPO' : 'All'}{' '}
+          <span className="opacity-60">({counts[k]})</span>
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
