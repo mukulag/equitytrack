@@ -262,7 +262,7 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
                 {formatCurrency(exit.pnl)}
               </span>
             </td>
-            <td colSpan={5}></td>
+            <td colSpan={6}></td>
             <td className="p-4">
               <div className="flex items-center gap-1">
                 <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
