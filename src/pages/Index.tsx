@@ -293,12 +293,14 @@ const Index = () => {
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Your Trades</h2>
           <TradesTable
-            trades={trades}
+            trades={groupedTrades}
+            typeFilter={typeFilter}
+            setTypeFilter={setTypeFilter}
+            counts={counts}
             onAddExit={addExit}
             onDeleteTrade={deleteTrade}
             onDeleteExit={deleteExit}
             onUpdateCurrentPrice={updateCurrentPrice}
-            
             onEditTrade={editTrade}
             onEditExit={editExit}
           />
