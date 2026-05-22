@@ -286,17 +286,19 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             </td>
             <td colSpan={6}></td>
             <td className="p-4">
-              <div className="flex items-center gap-1">
-                <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => onDeleteExit(trade.id, exit.id)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
+              {!isGroup && (
+                <div className="flex items-center gap-1">
+                  <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => onDeleteExit(trade.id, exit.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
             </td>
           </tr>
         ))}
