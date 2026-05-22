@@ -225,34 +225,38 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </div>
         </td>
         <td className="p-4">
-          <div className="flex items-center gap-1">
-            <AddExitDialog trade={trade} onAddExit={onAddExit} />
-            <EditTradeDialog trade={trade} onEditTrade={onEditTrade} />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="glass-card border-border">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Trade</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete this trade? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => onDeleteTrade(trade.id)}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          {isGroup ? (
+            <span className="text-xs text-muted-foreground">{(trade as GroupedTrade).sourceTrades.length} lots</span>
+          ) : (
+            <div className="flex items-center gap-1">
+              <AddExitDialog trade={trade} onAddExit={onAddExit} />
+              <EditTradeDialog trade={trade} onEditTrade={onEditTrade} />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="glass-card border-border">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Trade</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete this trade? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => onDeleteTrade(trade.id)}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </td>
       </tr>
       {expanded &&
