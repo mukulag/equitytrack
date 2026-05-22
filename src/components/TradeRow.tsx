@@ -103,9 +103,22 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </div>
         </td>
         <td className="p-4 font-mono text-sm md:sticky md:left-[120px] md:z-10 bg-background min-w-[100px]">{format(new Date(trade.entryDate), 'dd MMM')}</td>
-        <td className="p-4 font-mono text-sm md:sticky md:left-[220px] md:z-10 bg-background min-w-[100px]">{formatCurrency(trade.entryPrice)}</td>
+        <td className="p-4 font-mono text-sm md:sticky md:left-[220px] md:z-10 bg-background min-w-[100px]">
+          <div>{formatCurrency(trade.entryPrice)}</div>
+          {avgExit != null && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">Avg Exit: {formatCurrency(avgExit)}</div>
+          )}
+        </td>
         <td className="p-4 md:sticky md:left-[320px] md:z-10 bg-background min-w-[100px]">
-          {editingPrice ? (
+          {isGroup ? (
+            <span className={cn('font-mono text-sm',
+              trade.currentPrice ? (
+                trade.currentPrice > trade.entryPrice ? 'text-success' : 'text-destructive'
+              ) : 'text-muted-foreground'
+            )}>
+              {trade.currentPrice ? formatCurrency(trade.currentPrice) : '—'}
+            </span>
+          ) : editingPrice ? (
             <Input
               type="number"
               step="0.01"
