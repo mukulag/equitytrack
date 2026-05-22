@@ -11,11 +11,58 @@ import { Footer } from '@/components/Footer';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { KiteImportDialog, ParsedCSVTrade } from '@/components/KiteImportDialog';
+import { groupTradesBySymbol, computeGroupedMetrics } from '@/lib/groupTrades';
+import type { TypeFilter } from '@/components/TradesTable';
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, editTrade, editExit, getStats, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, editTrade, editExit, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
   const { signOut, user } = useAuth();
-  const stats = getStats();
+
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('tradesTypeFilter');
+      if (v === 'MANUAL' || v === 'IPO') return v;
+    }
+    return 'ALL';
+  });
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('tradesTypeFilter', typeFilter);
+  }, [typeFilter]);
+
+  const counts = React.useMemo(() => ({
+    ALL: trades.length,
+    MANUAL: trades.filter((t) => t.tradeType !== 'IPO').length,
+    IPO: trades.filter((t) => t.tradeType === 'IPO').length,
+  }), [trades]);
+
+  const filteredTrades = React.useMemo(() => trades.filter((t) => {
+    if (typeFilter === 'IPO') return t.tradeType === 'IPO';
+    if (typeFilter === 'MANUAL') return t.tradeType !== 'IPO';
+    return true;
+  }), [trades, typeFilter]);
+
+  const groupedTrades = React.useMemo(() => groupTradesBySymbol(filteredTrades), [filteredTrades]);
+
+  const stats = React.useMemo(() => {
+    const groups = groupedTrades;
+    const totalTrades = groups.length;
+    const openTrades = groups.filter((g) => g.status !== 'CLOSED').length;
+    const closedTrades = groups.filter((g) => g.status === 'CLOSED').length;
+    const winningTrades = groups.filter((g) => g.status === 'CLOSED' && g.totalPnl > 0).length;
+    const losingTrades = groups.filter((g) => g.status === 'CLOSED' && g.totalPnl < 0).length;
+    const winRate = closedTrades > 0 ? (winningTrades / closedTrades) * 100 : 0;
+    const totalPnl = filteredTrades.reduce((s, t) => s + t.totalPnl, 0);
+
+    let unrealizedPnl = 0;
+    let totalExposure = 0;
+    for (const g of groups) {
+      const m = computeGroupedMetrics(g);
+      unrealizedPnl += m.unrealizedPnl;
+      if (g.status !== 'CLOSED') totalExposure += g.entryPrice * g.remainingQuantity;
+    }
+    return { totalTrades, openTrades, closedTrades, totalPnl, winningTrades, losingTrades, winRate, unrealizedPnl, totalExposure };
+  }, [groupedTrades, filteredTrades]);
 
   const handlePriceUpdate = useCallback((tradeId: string, price: number) => {
     updateCurrentPrice(tradeId, price, true);
