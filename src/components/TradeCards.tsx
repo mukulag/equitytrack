@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown } from 'lucide-react';
 import { computeTradeMetrics } from '@/lib/charges';
+import { computeGroupedMetrics, computeAvgExitPrice, GroupedTrade } from '@/lib/groupTrades';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-IN', {
