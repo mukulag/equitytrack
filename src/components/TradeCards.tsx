@@ -22,8 +22,10 @@ export const TradeCards = ({ trades }: { trades: Trade[] }) => {
       {trades.map((t) => {
         const isCmpAbove = t.currentPrice != null && t.currentPrice > t.entryPrice;
         const isCmpBelow = t.currentPrice != null && t.currentPrice < t.entryPrice;
-        const m = computeTradeMetrics(t);
+        const isGroup = !!(t as GroupedTrade).sourceTrades;
+        const m = isGroup ? computeGroupedMetrics(t as GroupedTrade) : computeTradeMetrics(t);
         const unrealized = m.unrealizedPnl;
+        const avgExit = isGroup ? computeAvgExitPrice(t.exits) : null;
 
         return (
         <details key={t.id} className="glass-card rounded-lg border p-3">
