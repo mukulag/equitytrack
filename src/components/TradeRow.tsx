@@ -64,8 +64,12 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
     }).format(value);
   };
 
-  const metrics = computeTradeMetrics(trade);
+  const isGroup = !!(trade as GroupedTrade).sourceTrades;
+  const metrics = isGroup
+    ? computeGroupedMetrics(trade as GroupedTrade)
+    : computeTradeMetrics(trade);
   const unrealizedPnl = metrics.unrealizedPnl;
+  const avgExit = isGroup ? computeAvgExitPrice(trade.exits) : null;
 
   const handlePriceSave = () => {
     onUpdateCurrentPrice(trade.id, tempPrice ? parseFloat(tempPrice) : null);
