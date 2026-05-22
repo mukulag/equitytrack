@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { computeTradeMetrics } from '@/lib/charges';
+import { computeGroupedMetrics, computeAvgExitPrice, GroupedTrade } from '@/lib/groupTrades';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,8 +64,12 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
     }).format(value);
   };
 
-  const metrics = computeTradeMetrics(trade);
+  const isGroup = !!(trade as GroupedTrade).sourceTrades;
+  const metrics = isGroup
+    ? computeGroupedMetrics(trade as GroupedTrade)
+    : computeTradeMetrics(trade);
   const unrealizedPnl = metrics.unrealizedPnl;
+  const avgExit = isGroup ? computeAvgExitPrice(trade.exits) : null;
 
   const handlePriceSave = () => {
     onUpdateCurrentPrice(trade.id, tempPrice ? parseFloat(tempPrice) : null);
@@ -98,9 +103,22 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </div>
         </td>
         <td className="p-4 font-mono text-sm md:sticky md:left-[120px] md:z-10 bg-background min-w-[100px]">{format(new Date(trade.entryDate), 'dd MMM')}</td>
-        <td className="p-4 font-mono text-sm md:sticky md:left-[220px] md:z-10 bg-background min-w-[100px]">{formatCurrency(trade.entryPrice)}</td>
+        <td className="p-4 font-mono text-sm md:sticky md:left-[220px] md:z-10 bg-background min-w-[100px]">
+          <div>{formatCurrency(trade.entryPrice)}</div>
+          {avgExit != null && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">Avg Exit: {formatCurrency(avgExit)}</div>
+          )}
+        </td>
         <td className="p-4 md:sticky md:left-[320px] md:z-10 bg-background min-w-[100px]">
-          {editingPrice ? (
+          {isGroup ? (
+            <span className={cn('font-mono text-sm',
+              trade.currentPrice ? (
+                trade.currentPrice > trade.entryPrice ? 'text-success' : 'text-destructive'
+              ) : 'text-muted-foreground'
+            )}>
+              {trade.currentPrice ? formatCurrency(trade.currentPrice) : '—'}
+            </span>
+          ) : editingPrice ? (
             <Input
               type="number"
               step="0.01"
@@ -207,34 +225,38 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
           </div>
         </td>
         <td className="p-4">
-          <div className="flex items-center gap-1">
-            <AddExitDialog trade={trade} onAddExit={onAddExit} />
-            <EditTradeDialog trade={trade} onEditTrade={onEditTrade} />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="glass-card border-border">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Trade</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete this trade? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => onDeleteTrade(trade.id)}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          {isGroup ? (
+            <span className="text-xs text-muted-foreground">{(trade as GroupedTrade).sourceTrades.length} lots</span>
+          ) : (
+            <div className="flex items-center gap-1">
+              <AddExitDialog trade={trade} onAddExit={onAddExit} />
+              <EditTradeDialog trade={trade} onEditTrade={onEditTrade} />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="glass-card border-border">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Trade</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete this trade? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => onDeleteTrade(trade.id)}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </td>
       </tr>
       {expanded &&
@@ -264,17 +286,19 @@ export const TradeRow = ({ trade, onAddExit, onDeleteTrade, onDeleteExit, onUpda
             </td>
             <td colSpan={6}></td>
             <td className="p-4">
-              <div className="flex items-center gap-1">
-                <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => onDeleteExit(trade.id, exit.id)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
+              {!isGroup && (
+                <div className="flex items-center gap-1">
+                  <EditExitDialog exit={exit} tradeId={trade.id} onEditExit={onEditExit} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => onDeleteExit(trade.id, exit.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
             </td>
           </tr>
         ))}

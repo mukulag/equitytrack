@@ -3,8 +3,13 @@ import { Trade, TradeType } from '@/types/trade';
 import { TradeRow } from './TradeRow';
 import TradeCards from './TradeCards';
 
+export type TypeFilter = 'ALL' | 'MANUAL' | 'IPO';
+
 interface TradesTableProps {
   trades: Trade[];
+  typeFilter: TypeFilter;
+  setTypeFilter: (f: TypeFilter) => void;
+  counts: { ALL: number; MANUAL: number; IPO: number };
   onAddExit: (tradeId: string, exit: { quantity: number; exitPrice: number; exitDate: string }) => void;
   onDeleteTrade: (tradeId: string) => void;
   onDeleteExit: (tradeId: string, exitId: string) => void;
@@ -25,7 +30,7 @@ interface TradesTableProps {
   }) => void;
 }
 
-export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onEditTrade, onEditExit }: TradesTableProps) => {
+export const TradesTable = ({ trades, typeFilter, setTypeFilter, counts, onAddExit, onDeleteTrade, onDeleteExit, onUpdateCurrentPrice, onEditTrade, onEditExit }: TradesTableProps) => {
   const [mobileView, setMobileView] = useState<'table' | 'cards'>(() => {
     if (typeof window !== 'undefined') {
       const v = localStorage.getItem('tradesMobileView');
@@ -34,39 +39,13 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
     return 'table';
   });
 
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'MANUAL' | 'IPO'>(() => {
-    if (typeof window !== 'undefined') {
-      const v = localStorage.getItem('tradesTypeFilter');
-      if (v === 'MANUAL' || v === 'IPO') return v;
-    }
-    return 'ALL';
-  });
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('tradesMobileView', mobileView);
     }
   }, [mobileView]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('tradesTypeFilter', typeFilter);
-    }
-  }, [typeFilter]);
-
-  const counts = {
-    ALL: trades.length,
-    MANUAL: trades.filter((t) => t.tradeType !== 'IPO').length,
-    IPO: trades.filter((t) => t.tradeType === 'IPO').length,
-  };
-
-  const filteredTrades = trades.filter((t) => {
-    if (typeFilter === 'IPO') return t.tradeType === 'IPO';
-    if (typeFilter === 'MANUAL') return t.tradeType !== 'IPO';
-    return true;
-  });
-
-  if (trades.length === 0) {
+  if (counts.ALL === 0) {
     return (
       <div className="glass-card rounded-xl p-12 text-center animate-fade-in">
         <div className="text-muted-foreground">
@@ -98,7 +77,6 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
 
   return (
     <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
-      {/* Filter + mobile toggle bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-4">
         {FilterTabs}
         <div className="flex items-center gap-2 md:hidden">
@@ -117,12 +95,10 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
         </div>
       </div>
 
-      {/* Cards view (mobile only) */}
       <div className={`${mobileView === 'cards' ? 'block' : 'hidden'} md:hidden`}>
-        <TradeCards trades={filteredTrades} />
+        <TradeCards trades={trades} />
       </div>
 
-      {/* Table view */}
       <div className={`${mobileView === 'cards' ? 'hidden' : ''}`}>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -130,7 +106,7 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
               <tr className="border-b border-border bg-secondary/30">
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground sticky left-0 z-10 bg-secondary/30 min-w-[120px]">Symbol</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground md:sticky md:left-[120px] md:z-10 bg-secondary/30 min-w-[100px]">Date</th>
-                <th className="text-left p-4 text-sm font-semibold text-muted-foreground md:sticky md:left-[220px] md:z-10 bg-secondary/30 min-w-[100px]">Entry</th>
+                <th className="text-left p-4 text-sm font-semibold text-muted-foreground md:sticky md:left-[220px] md:z-10 bg-secondary/30 min-w-[100px]">Avg Entry</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground md:sticky md:left-[320px] md:z-10 bg-secondary/30 min-w-[100px]">CMP</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Qty</th>
                 <th className="text-left p-4 text-sm font-semibold text-muted-foreground">Status</th>
@@ -145,7 +121,7 @@ export const TradesTable = ({ trades, onAddExit, onDeleteTrade, onDeleteExit, on
               </tr>
             </thead>
             <tbody>
-              {filteredTrades.map((trade) => (
+              {trades.map((trade) => (
                 <TradeRow
                   key={trade.id}
                   trade={trade}
