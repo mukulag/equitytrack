@@ -45,7 +45,10 @@ export const TradeCards = ({ trades }: { trades: Trade[] }) => {
                   {t.currentPrice ? formatCurrency(t.currentPrice) : '—'}
                 </span>
               </div>
-              <div className="text-sm text-muted-foreground mt-1 whitespace-nowrap">Entry: {formatCurrency(t.entryPrice)}</div>
+              <div className="text-sm text-muted-foreground mt-1 whitespace-nowrap">
+                Entry: {formatCurrency(t.entryPrice)}
+                {avgExit != null && <span className="ml-1">· Exit: {formatCurrency(avgExit)}</span>}
+              </div>
             </div>
           </summary>
 
