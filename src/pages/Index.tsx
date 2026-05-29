@@ -148,7 +148,7 @@ const Index = () => {
     setSyncing(true);
     try {
       const [holdingsRes, ordersRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=holdings&access_token=${token}`),
+        fetch(`${SUPABASE_URL}/functions/v1/kite-holdings?access_token=${token}`),
         fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=orders&access_token=${token}`),
       ]);
 
