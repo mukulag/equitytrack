@@ -167,6 +167,9 @@ const Index = () => {
       let imported = 0, exits = 0;
 
       if (holdingsData.holdings?.length > 0) {
+        console.log('[Zerodha sync] Holdings from API:', holdingsData.holdings.map((h: any) =>
+          `${h.tradingsymbol}: qty=${h.quantity} t1=${h.t1_quantity} avg=₹${h.average_price}`
+        ));
         const r = await importHoldingsRef.current(holdingsData.holdings);
         imported += r.imported;
       }
