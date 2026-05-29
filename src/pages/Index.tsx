@@ -1,6 +1,6 @@
-import { TrendingUp, Activity, Target, PieChart, Wallet, BarChart3, LogOut, Download } from 'lucide-react';
+import { TrendingUp, Activity, Target, PieChart, Wallet, BarChart3, LogOut, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useTrades } from '@/hooks/useTrades';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { StatsCard } from '@/components/StatsCard';
@@ -13,10 +13,55 @@ import { Button } from '@/components/ui/button';
 import { KiteImportDialog, ParsedCSVTrade } from '@/components/KiteImportDialog';
 import { groupTradesBySymbol, computeGroupedMetrics } from '@/lib/groupTrades';
 import type { TypeFilter } from '@/components/TradesTable';
+import { toast } from 'sonner';
+
+const KITE_TOKEN_KEY = 'kite_access_token';
+const KITE_TOKEN_EXPIRY_KEY = 'kite_token_expiry';
+const SYNC_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between auto-syncs
+
+function getStoredToken(): string | null {
+  try {
+    const token = localStorage.getItem(KITE_TOKEN_KEY);
+    const expiry = localStorage.getItem(KITE_TOKEN_EXPIRY_KEY);
+    if (!token || !expiry || Date.now() > parseInt(expiry)) {
+      localStorage.removeItem(KITE_TOKEN_KEY);
+      localStorage.removeItem(KITE_TOKEN_EXPIRY_KEY);
+      return null;
+    }
+    return token;
+  } catch { return null; }
+}
+
+function storeToken(token: string) {
+  try {
+    // Kite tokens expire at 6 AM IST (00:30 UTC) the following day
+    const expiry = new Date();
+    expiry.setUTCHours(0, 30, 0, 0);
+    if (expiry.getTime() <= Date.now()) expiry.setDate(expiry.getDate() + 1);
+    localStorage.setItem(KITE_TOKEN_KEY, token);
+    localStorage.setItem(KITE_TOKEN_EXPIRY_KEY, expiry.getTime().toString());
+  } catch {}
+}
+
+function clearStoredToken() {
+  try {
+    localStorage.removeItem(KITE_TOKEN_KEY);
+    localStorage.removeItem(KITE_TOKEN_EXPIRY_KEY);
+  } catch {}
+}
+
+function formatLastSync(date: Date): string {
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  return `${Math.floor(diffMin / 60)}h ago`;
+}
 
 const Index = () => {
   const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, editTrade, editExit, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
+
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>(() => {
     if (typeof window !== 'undefined') {
@@ -26,7 +71,7 @@ const Index = () => {
     return 'ALL';
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window !== 'undefined') localStorage.setItem('tradesTypeFilter', typeFilter);
   }, [typeFilter]);
 
@@ -71,116 +116,148 @@ const Index = () => {
   const { isRefreshing, lastRefresh, refreshNow } = useLivePrices({
     trades,
     onPriceUpdate: handlePriceUpdate,
-    intervalMs: 300000, // Refresh every 5 minutes
+    intervalMs: 300000,
     enabled: !loading && trades.length > 0,
   });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  const formatCurrency = (value: number) => new Intl.NumberFormat('en-IN', {
+    style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(value);
 
-  // Kite Connect integration state
-  const [kiteToken, setKiteToken] = useState<string | null>(null);
+  // Zerodha / Kite Connect state
+  const [kiteToken, setKiteToken] = useState<string | null>(() => getStoredToken());
   const [kiteError, setKiteError] = useState<string | null>(null);
   const [kiteLoading, setKiteLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-  const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+  // Refs so effects with empty dep arrays can read current values
+  const kiteTokenRef = useRef(kiteToken);
+  const lastSyncRef = useRef<Date | null>(null);
+  const syncingRef = useRef(false);
+  const importHoldingsRef = useRef(importKiteHoldings);
+  const importOrdersRef = useRef(importKiteOrders);
 
-  // Fetch and auto-import holdings
-  const fetchAndSyncHoldings = React.useCallback(async (accessToken: string, showToast = true) => {
+  useEffect(() => { kiteTokenRef.current = kiteToken; }, [kiteToken]);
+  useEffect(() => { importHoldingsRef.current = importKiteHoldings; }, [importKiteHoldings]);
+  useEffect(() => { importOrdersRef.current = importKiteOrders; }, [importKiteOrders]);
+
+  const syncWithZerodha = async (token: string, silent = true) => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=holdings&access_token=${accessToken}`);
-      const holdingsData = await res.json();
-      
-      if (holdingsData.holdings && holdingsData.holdings.length > 0) {
-        const result = await importKiteHoldings(holdingsData.holdings);
-        setLastSync(new Date());
-        if (showToast && result.imported > 0) {
-          // Toast is already shown in importKiteHoldings
-        }
+      const [holdingsRes, ordersRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=holdings&access_token=${token}`),
+        fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=orders&access_token=${token}`),
+      ]);
+
+      const holdingsData = await holdingsRes.json();
+      const ordersData = await ordersRes.json();
+
+      // Detect expired / invalid token
+      if (!holdingsRes.ok || holdingsData.error) {
+        clearStoredToken();
+        setKiteToken(null);
+        kiteTokenRef.current = null;
+        setKiteError('Zerodha session expired — please reconnect');
+        return;
       }
-    } catch (error) {
-      console.error('Failed to sync holdings:', error);
-      if (showToast) {
-        setKiteError('Failed to sync holdings');
+
+      let imported = 0, exits = 0;
+
+      if (holdingsData.holdings?.length > 0) {
+        const r = await importHoldingsRef.current(holdingsData.holdings);
+        imported += r.imported;
       }
+      if (ordersData.orders?.length > 0) {
+        const r = await importOrdersRef.current(ordersData.orders);
+        imported += r.imported;
+        exits += r.exitsAdded ?? 0;
+      }
+
+      const now = new Date();
+      lastSyncRef.current = now;
+      setLastSync(now);
+      setKiteError(null);
+
+      if (!silent && (imported > 0 || exits > 0)) {
+        const parts: string[] = [];
+        if (imported > 0) parts.push(`${imported} trades`);
+        if (exits > 0) parts.push(`${exits} exits`);
+        toast.success(`Synced ${parts.join(' and ')} from Zerodha`);
+      } else if (!silent) {
+        toast.info('Already up to date');
+      }
+    } catch (err) {
+      console.error('Zerodha sync failed:', err);
+      if (!silent) toast.error('Failed to sync with Zerodha');
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
     }
-  }, [SUPABASE_URL, importKiteHoldings]);
+  };
 
-  // Handle Kite login redirect - auto-import on successful login
-  React.useEffect(() => {
+  // Auto-sync on mount if a valid token is stored
+  useEffect(() => {
+    const token = getStoredToken();
+    if (token) syncWithZerodha(token, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-sync when the user switches back to this tab, throttled to every 30 min
+  useEffect(() => {
+    const handleFocus = () => {
+      const token = kiteTokenRef.current;
+      if (!token) return;
+      const last = lastSyncRef.current;
+      if (!last || Date.now() - last.getTime() > SYNC_COOLDOWN_MS) {
+        syncWithZerodha(token, true);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle Zerodha OAuth callback (request_token in URL after redirect)
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestToken = params.get('request_token');
-    if (requestToken && !kiteToken) {
-      setKiteLoading(true);
-      // Clear the URL params
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_token: requestToken })
+    if (!requestToken || kiteTokenRef.current) return;
+
+    setKiteLoading(true);
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_token: requestToken }),
+    })
+      .then(res => res.json())
+      .then(async (data) => {
+        if (data.access_token) {
+          storeToken(data.access_token);
+          setKiteToken(data.access_token);
+          kiteTokenRef.current = data.access_token;
+          await syncWithZerodha(data.access_token, false);
+        } else {
+          setKiteError(data.error || 'Failed to connect to Zerodha');
+        }
       })
-        .then(res => res.json())
-        .then(async (data) => {
-          if (data.access_token) {
-            setKiteToken(data.access_token);
-            // Auto-import holdings immediately after login
-            await fetchAndSyncHoldings(data.access_token);
-          } else {
-            setKiteError(data.error || 'Failed to get access token');
-          }
-        })
-        .catch(() => setKiteError('Failed to get access token'))
-        .finally(() => setKiteLoading(false));
-    }
-  }, [kiteToken, SUPABASE_URL, fetchAndSyncHoldings]);
-
-  // Periodic background sync every 5 minutes when connected
-  React.useEffect(() => {
-    if (!kiteToken) return;
-
-    const intervalId = setInterval(() => {
-      fetchAndSyncHoldings(kiteToken, false); // Silent sync (no toast)
-    }, SYNC_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
-  }, [kiteToken, fetchAndSyncHoldings, SYNC_INTERVAL_MS]);
+      .catch(() => setKiteError('Failed to connect to Zerodha'))
+      .finally(() => setKiteLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleKiteLogin = async () => {
+    setKiteError(null);
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=login-url`);
       const data = await res.json();
-      if (data.login_url) {
-        window.location.href = data.login_url;
-      }
+      if (data.login_url) window.location.href = data.login_url;
     } catch {
-      setKiteError('Failed to get login URL');
-    }
-  };
-
-  const handleManualSync = async () => {
-    if (!kiteToken) return;
-    await fetchAndSyncHoldings(kiteToken);
-  };
-
-  const handleImportTodaysOrders = async () => {
-    if (!kiteToken) return;
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=orders&access_token=${kiteToken}`);
-    const data = await res.json();
-    if (data.orders) {
-      await importKiteOrders(data.orders);
+      setKiteError('Failed to get Zerodha login URL');
     }
   };
 
@@ -210,43 +287,40 @@ const Index = () => {
                 onRefresh={refreshNow}
               />
               <AddTradeDialog onAddTrade={addTrade} />
-
-              {/* Theme toggle (hidden on small screens) */}
               <div className="hidden md:block">
                 <ThemeToggle />
               </div>
-
               <Button variant="ghost" size="icon" onClick={signOut} title="Sign out">
                 <LogOut className="h-4 w-4" />
-              </Button> 
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-8 flex-1">
-        {/* Kite Connect Button and Sync Status */}
+        {/* Zerodha sync status bar */}
         <div className="mb-6 flex flex-wrap items-center gap-3">
-          <Button onClick={handleKiteLogin} disabled={kiteLoading || !!kiteToken} variant="outline">
-            {kiteLoading ? 'Connecting...' : kiteToken ? 'Connected to Kite' : 'Connect Kite Account'}
-          </Button>
-          {kiteToken && (
-            <Button onClick={handleManualSync} disabled={syncing} variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              {syncing ? 'Syncing...' : 'Sync Holdings'}
-            </Button>
+          {kiteToken ? (
+            <div className="flex items-center gap-2 text-sm">
+              {syncing
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                : <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+              }
+              <span className="text-muted-foreground">
+                {syncing ? 'Syncing with Zerodha...' : `Zerodha synced${lastSync ? ` · ${formatLastSync(lastSync)}` : ''}`}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {kiteError && <AlertCircle className="h-3.5 w-3.5 text-amber-500" />}
+              <Button onClick={handleKiteLogin} disabled={kiteLoading} variant="outline" size="sm">
+                {kiteLoading ? 'Connecting...' : kiteError ? 'Reconnect Zerodha' : 'Connect Zerodha'}
+              </Button>
+              {kiteError && <span className="text-xs text-muted-foreground">{kiteError}</span>}
+            </div>
           )}
-          <KiteImportDialog
-            kiteToken={kiteToken}
-            onImportTodaysOrders={handleImportTodaysOrders}
-            onImportCSV={handleImportCSV}
-          />
-          {kiteToken && lastSync && (
-            <span className="text-xs text-muted-foreground">
-              Last sync: {lastSync.toLocaleTimeString()}
-            </span>
-          )}
-          {kiteError && <span className="text-destructive text-sm">{kiteError}</span>}
+          <KiteImportDialog onImportCSV={handleImportCSV} />
         </div>
 
         {loading ? (
@@ -255,56 +329,52 @@ const Index = () => {
           </div>
         ) : (
           <>
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 auto-rows-fr">
-          <StatsCard
-            title="Total Exposure"
-            value={formatCurrency(stats.totalExposure)}
-            icon={BarChart3}
-          />
-          <StatsCard
-            title="Unrealized P&L"
-            value={formatCurrency(stats.unrealizedPnl)}
-            icon={TrendingUp}
-            trend={stats.unrealizedPnl > 0 ? 'up' : stats.unrealizedPnl < 0 ? 'down' : 'neutral'}
-          />
-          <StatsCard
-            title="Booked P&L"
-            value={formatCurrency(stats.totalPnl)}
-            icon={Wallet}
-            trend={stats.totalPnl > 0 ? 'up' : stats.totalPnl < 0 ? 'down' : 'neutral'}
-          />
-          <StatsCard
-            title="Win Rate"
-            value={`${stats.winRate.toFixed(1)}%`}
-            icon={Target}
-            trend={stats.winRate >= 50 ? 'up' : stats.winRate > 0 ? 'down' : 'neutral'}
-            subtitle={`${stats.winningTrades}W / ${stats.losingTrades}L`}
-          />
-          <StatsCard
-            title="Open / Total"
-            value={`${stats.openTrades} / ${stats.totalTrades}`}
-            icon={PieChart}
-            subtitle={`${stats.closedTrades} closed`}
-          />
-        </div>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8 auto-rows-fr">
+              <StatsCard title="Total Exposure" value={formatCurrency(stats.totalExposure)} icon={BarChart3} />
+              <StatsCard
+                title="Unrealized P&L"
+                value={formatCurrency(stats.unrealizedPnl)}
+                icon={TrendingUp}
+                trend={stats.unrealizedPnl > 0 ? 'up' : stats.unrealizedPnl < 0 ? 'down' : 'neutral'}
+              />
+              <StatsCard
+                title="Booked P&L"
+                value={formatCurrency(stats.totalPnl)}
+                icon={Wallet}
+                trend={stats.totalPnl > 0 ? 'up' : stats.totalPnl < 0 ? 'down' : 'neutral'}
+              />
+              <StatsCard
+                title="Win Rate"
+                value={`${stats.winRate.toFixed(1)}%`}
+                icon={Target}
+                trend={stats.winRate >= 50 ? 'up' : stats.winRate > 0 ? 'down' : 'neutral'}
+                subtitle={`${stats.winningTrades}W / ${stats.losingTrades}L`}
+              />
+              <StatsCard
+                title="Open / Total"
+                value={`${stats.openTrades} / ${stats.totalTrades}`}
+                icon={PieChart}
+                subtitle={`${stats.closedTrades} closed`}
+              />
+            </div>
 
-        {/* Trades Table */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Your Trades</h2>
-          <TradesTable
-            trades={groupedTrades}
-            typeFilter={typeFilter}
-            setTypeFilter={setTypeFilter}
-            counts={counts}
-            onAddExit={addExit}
-            onDeleteTrade={deleteTrade}
-            onDeleteExit={deleteExit}
-            onUpdateCurrentPrice={updateCurrentPrice}
-            onEditTrade={editTrade}
-            onEditExit={editExit}
-          />
-        </div>
+            {/* Trades Table */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">Your Trades</h2>
+              <TradesTable
+                trades={groupedTrades}
+                typeFilter={typeFilter}
+                setTypeFilter={setTypeFilter}
+                counts={counts}
+                onAddExit={addExit}
+                onDeleteTrade={deleteTrade}
+                onDeleteExit={deleteExit}
+                onUpdateCurrentPrice={updateCurrentPrice}
+                onEditTrade={editTrade}
+                onEditExit={editExit}
+              />
+            </div>
           </>
         )}
       </main>

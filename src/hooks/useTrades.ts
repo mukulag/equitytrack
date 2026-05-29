@@ -668,7 +668,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           }
         }
 
-        // Check for duplicate
+        // Exact duplicate check (symbol + price + date)
         const { data: existing } = await supabase
           .from('trades')
           .select('id')
@@ -679,6 +679,26 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           .limit(1);
 
         if (existing && existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        // Holdings-imported trades have today's date as entry_date (Kite doesn't expose purchase date).
+        // If the CSV provides the real purchase date, update the existing holding instead of creating a duplicate.
+        const { data: holdingMatch } = await supabase
+          .from('trades')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('symbol', finalTrade.symbol)
+          .eq('entry_price', finalTrade.entryPrice)
+          .ilike('notes', '%Kite Holdings%')
+          .limit(1);
+
+        if (holdingMatch && holdingMatch.length > 0) {
+          await supabase
+            .from('trades')
+            .update({ entry_date: finalTrade.entryDate, notes: 'Imported from Kite (date corrected via CSV)' })
+            .eq('id', holdingMatch[0].id);
           skipped++;
           continue;
         }
