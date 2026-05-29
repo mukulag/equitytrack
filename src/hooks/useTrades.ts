@@ -420,6 +420,14 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
 
     for (const holding of holdings) {
       try {
+        // quantity = settled shares; t1_quantity = T+1 pending settlement (newly bought, not yet in demat)
+        const totalQty = (Number(holding.quantity) || 0) + (Number(holding.t1_quantity) || 0);
+        if (totalQty === 0) {
+          console.log(`Skipping ${holding.tradingsymbol}: zero quantity (quantity=${holding.quantity}, t1_quantity=${holding.t1_quantity})`);
+          skipped++;
+          continue;
+        }
+
         // Check if trade already exists with same symbol and average price
         const { data: existing } = await supabase
           .from('trades')
@@ -430,11 +438,11 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           .limit(1);
 
         if (existing && existing.length > 0) {
+          console.log(`Skipping ${holding.tradingsymbol}: already in journal at avg price ${holding.average_price}`);
           skipped++;
           continue;
         }
 
-        // Use today's date as entry date since holdings don't have purchase date
         const entryDate = new Date().toISOString().split('T')[0];
 
         const { error } = await supabase.from('trades').insert({
@@ -443,8 +451,8 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           trade_type: 'LONG',
           entry_date: entryDate,
           entry_price: holding.average_price,
-          quantity: holding.quantity,
-          remaining_quantity: holding.quantity,
+          quantity: totalQty,
+          remaining_quantity: totalQty,
           current_price: holding.last_price,
           notes: `Imported from Kite Holdings - ISIN: ${holding.isin || 'N/A'}`,
           is_mtf: holding.product === 'MTF',
@@ -453,7 +461,7 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
         if (error) throw error;
         imported++;
       } catch (error) {
-        console.error('Failed to import holding:', holding, error);
+        console.error(`Failed to import holding ${holding.tradingsymbol}:`, error);
         skipped++;
       }
     }
