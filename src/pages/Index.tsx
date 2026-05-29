@@ -152,11 +152,12 @@ const Index = () => {
         fetch(`${SUPABASE_URL}/functions/v1/kite-auth?action=orders&access_token=${token}`),
       ]);
 
-      const holdingsData = await holdingsRes.json();
-      const ordersData = await ordersRes.json();
+      const holdingsData = holdingsRes.ok ? await holdingsRes.json() : null;
+      const ordersData = ordersRes.ok ? await ordersRes.json() : null;
 
-      // Detect expired / invalid token
-      if (!holdingsRes.ok || holdingsData.error) {
+      // Token expired = Kite explicitly returns a token error (not a timeout/server error)
+      const tokenError = (d: any) => d?.error && /token/i.test(d.error);
+      if (tokenError(holdingsData) || tokenError(ordersData) || (holdingsRes.status === 403 || ordersRes.status === 403)) {
         clearStoredToken();
         setKiteToken(null);
         kiteTokenRef.current = null;
@@ -166,14 +167,17 @@ const Index = () => {
 
       let imported = 0, exits = 0;
 
-      if (holdingsData.holdings?.length > 0) {
+      if (holdingsData?.holdings?.length > 0) {
         console.log('[Zerodha sync] Holdings from API:', holdingsData.holdings.map((h: any) =>
           `${h.tradingsymbol}: qty=${h.quantity} t1=${h.t1_quantity} avg=₹${h.average_price}`
         ));
         const r = await importHoldingsRef.current(holdingsData.holdings);
         imported += r.imported;
+      } else if (!holdingsRes.ok) {
+        console.warn('[Zerodha sync] Holdings fetch failed (status', holdingsRes.status, ') — will retry next sync');
       }
-      if (ordersData.orders?.length > 0) {
+
+      if (ordersData?.orders?.length > 0) {
         const r = await importOrdersRef.current(ordersData.orders);
         imported += r.imported;
         exits += r.exitsAdded ?? 0;
@@ -395,7 +399,7 @@ const Index = () => {
         )}
       </main>
 
-      <Footer paypalEmail="mukulag@gmail.com" />
+      <Footer />
     </div>
   );
 };
