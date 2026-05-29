@@ -428,17 +428,18 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
           continue;
         }
 
-        // Check if trade already exists with same symbol and average price
+        // Only check non-closed trades — a closed trade at the same price must not block a new open position
         const { data: existing } = await supabase
           .from('trades')
           .select('id')
           .eq('user_id', user.id)
           .eq('symbol', holding.tradingsymbol)
           .eq('entry_price', holding.average_price)
+          .in('status', ['OPEN', 'PARTIAL'])
           .limit(1);
 
         if (existing && existing.length > 0) {
-          console.log(`Skipping ${holding.tradingsymbol}: already in journal at avg price ${holding.average_price}`);
+          console.log(`Skipping ${holding.tradingsymbol}: open position already in journal at avg price ${holding.average_price}`);
           skipped++;
           continue;
         }
