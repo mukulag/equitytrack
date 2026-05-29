@@ -794,6 +794,28 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     return { imported, skipped };
   };
 
+  const clearAllTrades = async () => {
+    if (!user) return;
+    try {
+      const { data: userTrades } = await supabase
+        .from('trades')
+        .select('id')
+        .eq('user_id', user.id);
+
+      if (userTrades && userTrades.length > 0) {
+        const ids = userTrades.map((t) => t.id);
+        await supabase.from('exits').delete().in('trade_id', ids);
+      }
+
+      await supabase.from('trades').delete().eq('user_id', user.id);
+      toast.success('All trades cleared');
+      fetchTrades();
+    } catch (error: any) {
+      toast.error('Failed to clear trades');
+      console.error('Clear trades error:', error);
+    }
+  };
+
   return {
     trades,
     loading,
@@ -802,13 +824,13 @@ const updateCurrentPrice = async (tradeId: string, currentPrice: number | null, 
     deleteTrade,
     deleteExit,
     updateCurrentPrice,
-    
     editTrade,
     editExit,
     getStats,
     importKiteHoldings,
     importKiteOrders,
     importCSVTrades,
+    clearAllTrades,
     refetch: fetchTrades,
   };
 };

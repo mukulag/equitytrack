@@ -1,4 +1,4 @@
-import { TrendingUp, Activity, Target, PieChart, Wallet, BarChart3, LogOut, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { TrendingUp, Activity, Target, PieChart, Wallet, BarChart3, LogOut, CheckCircle2, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useTrades } from '@/hooks/useTrades';
@@ -58,7 +58,7 @@ function formatLastSync(date: Date): string {
 }
 
 const Index = () => {
-  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, editTrade, editExit, importKiteHoldings, importKiteOrders, importCSVTrades } = useTrades();
+  const { trades, loading, addTrade, addExit, deleteTrade, deleteExit, updateCurrentPrice, editTrade, editExit, importKiteHoldings, importKiteOrders, importCSVTrades, clearAllTrades } = useTrades();
   const { signOut } = useAuth();
 
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -324,6 +324,19 @@ const Index = () => {
             </div>
           )}
           <KiteImportDialog onImportCSV={handleImportCSV} />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => {
+              if (window.confirm('Delete ALL trades and exits? This cannot be undone.')) {
+                clearAllTrades();
+              }
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Reset
+          </Button>
         </div>
 
         {loading ? (
